@@ -51,3 +51,42 @@
    - Identity: is, is not -> checks if same object in memory
    - Membership: in, not in -> checks if value exists in sequence
    - Bitwise: &, |, ^, ~, <<, >>
+
+
+# Day 30/6
+- Add List Items:
+      - Insert():
+      - Append Items: to add item to the end of the list
+      - Insert Items: to insert a list item at a specified index
+      - Extend List: 
+         + to append fr another list to this list 
+         + can add any object (tuple, sets) Ex: add  a tuple to a list
+
+- Remove Specified Item
+      + remove(): remove fl name
+      + pop(): remove fl index  
+         * if not specify index, the pop remove the last item
+      + del() : same as pop but different syntax : del thislist[0]
+         * can delete completely
+      + clear(): empties the list, the list still remain but it has no content
+      + 
+   - Loop List
+      - for loop: 
+         + range(), len()
+      - while loop:
+   - The syntax
+      newlist = [expression for item in iterable if condition == True]
+   
+- Sort Lists
+   - sort(): will sort the list alphanumerically
+   - sort(reverse = True) : list descending
+   - sort(key = myfunc)
+   - reverse()
+- Copy Lists:
+   - copy(): 
+   - list() : the same
+   - slice(:): empty start index and end index to have a same feature
+- Join Lists:
+   - use + operator
+   - extend() : list1.extend(list2)
+   -
