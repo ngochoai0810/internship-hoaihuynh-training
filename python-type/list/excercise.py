@@ -32,4 +32,3 @@ for x in factors:
     product *= x
 
 print(f"Product: {product}")
-

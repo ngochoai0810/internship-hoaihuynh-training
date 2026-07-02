@@ -23,4 +23,3 @@ while i < len(thatlist):
 
 newlist =[x for x in thatlist if "a" in x]
 print(newlist)
-

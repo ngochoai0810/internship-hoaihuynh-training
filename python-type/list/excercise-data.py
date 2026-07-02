@@ -10,4 +10,3 @@ newlist = [x.upper() for x in raw_folder]
 thislist = ["orange", "mango", "kiwi", "pineapple", "banana"]
 thislist.sort()
 print(thislist)
-
