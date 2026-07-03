@@ -1,4 +1,13 @@
+venv/
 .venv/
 __pycache__/
 *.pyc
-.mypy_cache
+*.pyo
+*.pyd
+.pytest_cache/
+.idea/
+.env
+.mypy_cache/
+data/
+*.csv
+*.zip
