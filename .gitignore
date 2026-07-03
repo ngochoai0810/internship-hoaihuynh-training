@@ -1,5 +1,5 @@
-
 venv/
+.venv/
 __pycache__/
 *.pyc
 *.pyo
@@ -7,3 +7,7 @@ __pycache__/
 .pytest_cache/
 .idea/
 .env
+.mypy_cache/
+data/
+*.csv
+*.zip
