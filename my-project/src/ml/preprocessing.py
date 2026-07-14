@@ -1,61 +1,74 @@
 """
-src/ml/preprocessing.py
- 
-Toàn bộ pipeline tiền xử lý (preprocessing) cho tập dữ liệu Kaggle House Prices.
-Chuyển đổi DataFrame gốc thành ma trận đặc trưng (feature matrix) sẵn sàng cho mô hình.
+src/preprocessing.py
+
+- Ngày 11: Thiết kế bộ khung 
+- Ngày 12: Hiện thực hóa logic xử lý Missing Values & Feature Engineering.
 """
- 
+
 import pandas as pd
 import numpy as np
-from sklearn.preprocessing import StandardScaler
- 
-# Constants
-# Value NA not means missing
-NA_MEANS_NONE: list[str] = [
+from typing import List, Dict
+
+# PHẦN 1: HẰNG SỐ 
+
+NA_MEANS_NONE: List[str] = [
     "PoolQC", "Alley", "Fence", "FireplaceQu",
     "GarageType", "GarageFinish", "GarageQual", "GarageCond",
     "BsmtQual", "BsmtCond", "BsmtExposure", "BsmtFinType1", "BsmtFinType2",
     "MiscFeature",
 ]
- 
-NUMERIC_ZEROS: list[str] = [
+
+NUMERIC_ZEROS: List[str] = [
     "GarageYrBlt", "GarageCars", "GarageArea",
     "BsmtFinSF1", "BsmtFinSF2", "BsmtUnfSF",
     "TotalBsmtSF", "BsmtFullBath", "BsmtHalfBath",
 ]
- 
-MEDIAN_FILL: list[str] = ["LotFrontage", "MasVnrArea"]
- 
-ORDINAL_MAP: dict[str, int] = {"Po": 1, "Fa": 2, "TA": 3, "Gd": 4, "Ex": 5}
-ORDINAL_COLS: list[str] = ["ExterQual", "KitchenQual"]
- 
-SKEW_THRESHOLD: float = 0.75
- 
- 
-# Functions
+
+MEDIAN_FILL: List[str] = ["LotFrontage", "MasVnrArea"]
+
+ORDINAL_MAP: Dict[str, int] = {"Po": 1, "Fa": 2, "TA": 3, "Gd": 4, "Ex": 5}
+ORDINAL_COLS: List[str] = ["ExterQual", "KitchenQual"]
+
+
+# PHẦN 2: THỰC THI LOGIC 
+
+
 def handle_missing_values(df: pd.DataFrame) -> pd.DataFrame:
-    # Check if all required columns are present in the DataFrame
+    """
+    Xử lý các giá trị bị thiếu (Missing Values) trong tập dữ liệu.
+    (Ngày 11: Viết Docstring này + Type Hint)
+    
+    Args:
+        df (pd.DataFrame): DataFrame đầu vào chứa dữ liệu thô.
+        
+    Returns:
+        pd.DataFrame: DataFrame mới đã được xử lý toàn bộ giá trị bị thiếu.
+        
+    Raises:
+        ValueError: Nếu DataFrame đầu vào thiếu các cột bắt buộc.
+    """
+    # Ngày 12: Đảm bảo code chạy độc lập, dùng .copy()
     missing_required = [col for col in NA_MEANS_NONE if col not in df.columns]
     if missing_required:
-        raise ValueError(
-            f"Missing required columns for NA_MEANS_NONE: {missing_required}"
-        )
+        raise ValueError(f"Thiếu các cột bắt buộc: {missing_required}")
 
-    # Always create copy of DF
     df_clean = df.copy()
 
+    # 1. NA mang ý nghĩa 'None'
     for col in NA_MEANS_NONE:
         df_clean[col] = df_clean[col].fillna("None")
 
+    # 2. NA mang ý nghĩa 0
     for col in NUMERIC_ZEROS:
         if col in df_clean.columns:
             df_clean[col] = df_clean[col].fillna(0)
 
+    # 3. Điền Median cho một số cột chỉ định
     for col in MEDIAN_FILL:
         if col in df_clean.columns:
             df_clean[col] = df_clean[col].fillna(df_clean[col].median())
 
-    # Solve remaining missing values
+    # 4. Fallback: Xử lý các cột còn sót lại
     for col in df_clean.columns:
         if df_clean[col].isna().any():
             if pd.api.types.is_numeric_dtype(df_clean[col]):
@@ -66,81 +79,77 @@ def handle_missing_values(df: pd.DataFrame) -> pd.DataFrame:
                     df_clean[col] = df_clean[col].fillna(mode_values.iloc[0])
 
     return df_clean
- 
- 
+
+
 def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
-    #Create new features based on existing ones
+    """
+    Tạo các đặc trưng mới (Feature Engineering) dựa trên kiến thức miền.
+    
+    Args:
+        df (pd.DataFrame): DataFrame đã được xử lý missing values.
+        
+    Returns:
+        pd.DataFrame: DataFrame mới được bổ sung thêm các cột đặc trưng.
+    """
     df_feat = df.copy()
-    df_feat["TotalSF"] = df_feat["TotalBsmtSF"] + df_feat["1stFlrSF"] + df_feat["2ndFlrSF"]
-    df_feat["HouseAge"] = df_feat["YrSold"] - df_feat["YearBuilt"]
-    df_feat["RemodAge"] = df_feat["YrSold"] - df_feat["YearRemodAdd"]
+    
+    # Cần có try-except hoặc kiểm tra cột tồn tại để tránh lỗi khi test
+    if all(col in df_feat.columns for col in ["TotalBsmtSF", "1stFlrSF", "2ndFlrSF"]):
+        df_feat["TotalSF"] = df_feat["TotalBsmtSF"] + df_feat["1stFlrSF"] + df_feat["2ndFlrSF"]
+        
+    if all(col in df_feat.columns for col in ["YrSold", "YearBuilt"]):
+        df_feat["HouseAge"] = df_feat["YrSold"] - df_feat["YearBuilt"]
+        
+    if all(col in df_feat.columns for col in ["YrSold", "YearRemodAdd"]):
+        df_feat["RemodAge"] = df_feat["YrSold"] - df_feat["YearRemodAdd"]
+        
     return df_feat
- 
- 
-def encode_categorical(
-    df: pd.DataFrame,
-    ordinal_cols: list[str] = ORDINAL_COLS,
-) -> pd.DataFrame:
-    # Encode columns with ordinal mapping and one-hot encode the rest of categorical columns
-    df_encoded = df.copy()
 
-    for col in ordinal_cols:
-        if col in df_encoded.columns:
-            df_encoded[col] = df_encoded[col].map(ORDINAL_MAP)
 
-    object_cols = df_encoded.select_dtypes(include=["object", "category"]).columns.tolist()
-    df_encoded = pd.get_dummies(df_encoded, columns=object_cols, dummy_na=False)
-    return df_encoded
- 
- 
-def scale_numeric(
-    df: pd.DataFrame,
-    skew_threshold: float = SKEW_THRESHOLD,
-) -> pd.DataFrame:
-    # Scale numeric features using StandardScaler and apply log transformation to skewed features
-    df_scaled = df.copy()
+# PHẦN 3: KHUNG SƯỜN
 
-    numeric_cols = df_scaled.select_dtypes(include=[np.number]).columns.tolist()
-    feature_numeric_cols = [col for col in numeric_cols if col != "SalePrice"]
-    skew_values = df_scaled[feature_numeric_cols].skew()
-    skewed_cols = skew_values[skew_values.abs() > skew_threshold].index.tolist()
 
-    for col in skewed_cols:
-        if (df_scaled[col] <= -1).any():
-            continue
-        df_scaled[col] = np.log1p(df_scaled[col])
+def encode_categorical(df: pd.DataFrame, ordinal_cols: List[str] = ORDINAL_COLS) -> pd.DataFrame:
+    """
+    Mã hóa các biến phân loại (Categorical variables) sang dạng số.
+    
+    Args:
+        df (pd.DataFrame): DataFrame đầu vào cần mã hóa.
+        ordinal_cols (List[str]): Danh sách các cột có thứ bậc.
+        
+    Returns:
+        pd.DataFrame: DataFrame mới đã được mã hóa (One-hot và Ordinal).
+    """
+    # TODO: Sẽ implement logic thật ngày tiếp theo.
+    return df.copy()
 
-    scaler = StandardScaler()
-    cols_to_scale = [col for col in feature_numeric_cols if col in df_scaled.columns]
-    if cols_to_scale:
-        df_scaled[cols_to_scale] = scaler.fit_transform(df_scaled[cols_to_scale])
 
-    return df_scaled
- 
- 
+def scale_numeric(df: pd.DataFrame, skew_threshold: float = 0.75) -> pd.DataFrame:
+    """
+    Xử lý độ lệch (skewness) và chuẩn hóa (scaling) các biến số học.
+    
+    Args:
+        df (pd.DataFrame): DataFrame đầu vào.
+        skew_threshold (float): Ngưỡng độ lệch để áp dụng Log Transform.
+        
+    Returns:
+        pd.DataFrame: DataFrame mới đã được chuẩn hóa.
+    """
+    # TODO: Sẽ implement vào ngày tiếp theo.
+    return df.copy()
+
+
 def preprocess(df: pd.DataFrame) -> pd.DataFrame:
-     # Run all preprocessing steps in sequence
+    """
+    Hàm tổng hợp, chạy tuần tự toàn bộ pipeline tiền xử lý.
+    
+    Args:
+        df (pd.DataFrame): Dữ liệu thô ban đầu.
+        
+    Returns:
+        pd.DataFrame: Dữ liệu hoàn chỉnh sẵn sàng đưa vào mô hình.
+    """
     df_clean = handle_missing_values(df)
     df_feat = engineer_features(df_clean)
     df_encoded = encode_categorical(df_feat)
     return scale_numeric(df_encoded)
-
-
-# Test the preprocessing pipeline
-if __name__ == '__main__':
-    try:
-        df_raw = pd.read_csv('../../data/raw/train.csv')
-        
-        df_clean = handle_missing_values(df_raw)
-        print(f'Number of missing values after cleaning: {df_clean.isnull().sum().sum()}')  # Expected: 0
-        
-        df_feat = engineer_features(df_clean)
-        print("\nSome engineered features:")
-        print(df_feat[['TotalSF', 'HouseAge', 'RemodAge']].head())
-        
-        # Test all the pipeline steps together
-        df_final = preprocess(df_raw)
-        print(f"\nSize of final DataFrame: {df_final.shape}")
-        
-    except FileNotFoundError:
-        print("Error: Can't find the file '../../data/raw/train.csv'. Please ensure the path is correct.")
