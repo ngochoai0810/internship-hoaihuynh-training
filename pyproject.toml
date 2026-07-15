@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "internship-hoaihuynh-training"
+version = "0.1.0"
+description = "Internship training project for backend and ML integration."
+readme = "Readme.md"
+requires-python = ">=3.11"
+authors = [
+  { name = "Hoai Huynh" }
+]
+
+[tool.setuptools.packages.find]
+where = ["my-project/src"]
+
+[tool.pytest.ini_options]
+testpaths = ["my-project/tests"]
+pythonpath = ["my-project/src/ml"]
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+check_untyped_defs = true
