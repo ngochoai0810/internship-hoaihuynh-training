@@ -9,5 +9,6 @@ __pycache__/
 .env
 .mypy_cache/
 data/
+my-project/artifacts/
 *.csv
 *.zip

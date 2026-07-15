@@ -8,6 +8,10 @@ src/preprocessing.py
 import pandas as pd
 import numpy as np
 from typing import List, Dict
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import StandardScaler, OneHotEncoder, OrdinalEncoder
+from sklearn.pipeline import Pipeline
+import joblib
 
 # PHẦN 1: HẰNG SỐ 
 
@@ -153,3 +157,91 @@ def preprocess(df: pd.DataFrame) -> pd.DataFrame:
     df_feat = engineer_features(df_clean)
     df_encoded = encode_categorical(df_feat)
     return scale_numeric(df_encoded)
+
+# PHẦN 3: MODULE HÓA ENCODING, SCALING & PIPELINE HỢP NHẤT
+
+def build_preprocessing_pipeline(numeric_features: List[str], 
+                                 categorical_features: List[str], 
+                                 ordinal_features: List[str]) -> ColumnTransformer:
+    """
+    Xây dựng pipeline xử lý dữ liệu chuẩn Scikit-learn sử dụng ColumnTransformer.
+    
+    Args:
+        numeric_features: Danh sách các cột dạng số.
+        categorical_features: Danh sách các cột phân loại (One-Hot).
+        ordinal_features: Danh sách các cột phân loại có thứ bậc (Ordinal).
+        
+    Returns:
+        ColumnTransformer: Đối tượng chứa toàn bộ quy trình biến đổi.
+    """
+    # 1. Pipeline cho dữ liệu số (Chỉ cần Scaling vì missing value đã xử lý ở pandas)
+    numeric_transformer = Pipeline(steps=[
+        ('scaler', StandardScaler())
+    ])
+
+    # 2. Pipeline cho dữ liệu phân loại danh nghĩa (One-Hot Encoding)
+    categorical_transformer = Pipeline(steps=[
+        ('onehot', OneHotEncoder(handle_unknown='ignore', sparse_output=False))
+    ])
+
+    # 3. Pipeline cho dữ liệu phân loại thứ bậc (Ordinal Encoding)
+    # Lưu ý: Cần định nghĩa rõ các categories theo thứ tự từ thấp đến cao cho từng cột ordinal
+    ordinal_transformer = Pipeline(steps=[
+        ('ordinal', OrdinalEncoder(handle_unknown='use_encoded_value', unknown_value=-1))
+    ])
+
+    # 4. Gộp tất cả lại bằng ColumnTransformer
+    preprocessor = ColumnTransformer(
+        transformers=[
+            ('num', numeric_transformer, numeric_features),
+            ('cat', categorical_transformer, categorical_features),
+            ('ord', ordinal_transformer, ordinal_features)
+        ],
+        remainder='passthrough' # Giữ nguyên các cột không được chỉ định
+    )
+
+    return preprocessor
+
+
+def preprocess_train(df: pd.DataFrame, num_cols: List[str], cat_cols: List[str], ord_cols: List[str], save_path: str = "preprocessor.pkl") -> np.ndarray:
+    """
+    Pipeline dùng riêng cho quá trình Huấn luyện (Train).
+    Thực hiện fit_transform và lưu lại bộ biến đổi.
+    """
+    # Bước 1: Tiền xử lý bằng custom functions (Pandas)
+    df_clean = handle_missing_values(df)
+    df_feat = engineer_features(df_clean)
+    
+    # Bước 2: Build sklearn pipeline
+    preprocessor = build_preprocessing_pipeline(num_cols, cat_cols, ord_cols)
+    
+    # Bước 3: Fit và Transform dữ liệu Train
+    # Quan trọng: fit_transform chỉ dùng cho tập train
+    X_processed = preprocessor.fit_transform(df_feat)
+    
+    # Bước 4: Lưu Pipeline lại bằng joblib
+    joblib.dump(preprocessor, save_path)
+    print(f"Pipeline đã được lưu tại: {save_path}")
+    
+    return X_processed
+
+
+def preprocess_test(df: pd.DataFrame, load_path: str = "preprocessor.pkl") -> np.ndarray:
+    """
+    Pipeline dùng cho quá trình Kiểm thử (Test) hoặc Suy diễn (Inference).
+    Chỉ thực hiện transform, không học (fit) thêm từ dữ liệu.
+    """
+    # Bước 1: Tiền xử lý bằng custom functions (Pandas)
+    df_clean = handle_missing_values(df)
+    df_feat = engineer_features(df_clean)
+    
+    # Bước 2: Load pipeline đã học từ tập Train
+    try:
+        preprocessor = joblib.load(load_path)
+    except FileNotFoundError:
+        raise ValueError(f"Không tìm thấy file {load_path}. Hãy chạy preprocess_train trước!")
+        
+    # Bước 3: Chỉ Transform (Tuyệt đối KHÔNG fit_transform ở bước này)
+    X_processed = preprocessor.transform(df_feat)
+    
+    return X_processed
