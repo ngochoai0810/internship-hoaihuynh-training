@@ -3,6 +3,8 @@ src/preprocessing.py
 
 - Ngày 11: Thiết kế bộ khung 
 - Ngày 12: Hiện thực hóa logic xử lý Missing Values & Feature Engineering.
+- Ngày 13: Module hóa Pipeline với Scikit-learn.
+- Ngày 14: Bổ sung Error Handling & Type Hint chuẩn xác.
 """
 
 import pandas as pd
@@ -51,7 +53,9 @@ def handle_missing_values(df: pd.DataFrame) -> pd.DataFrame:
     Raises:
         ValueError: Nếu DataFrame đầu vào thiếu các cột bắt buộc.
     """
-    # Ngày 12: Đảm bảo code chạy độc lập, dùng .copy()
+    if df.empty:
+        raise ValueError("Lỗi: DataFrame đầu vào đang trống (empty).")
+
     missing_required = [col for col in NA_MEANS_NONE if col not in df.columns]
     if missing_required:
         raise ValueError(f"Thiếu các cột bắt buộc: {missing_required}")
@@ -110,54 +114,6 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
     return df_feat
 
 
-# PHẦN 3: KHUNG SƯỜN
-
-
-def encode_categorical(df: pd.DataFrame, ordinal_cols: List[str] = ORDINAL_COLS) -> pd.DataFrame:
-    """
-    Mã hóa các biến phân loại (Categorical variables) sang dạng số.
-    
-    Args:
-        df (pd.DataFrame): DataFrame đầu vào cần mã hóa.
-        ordinal_cols (List[str]): Danh sách các cột có thứ bậc.
-        
-    Returns:
-        pd.DataFrame: DataFrame mới đã được mã hóa (One-hot và Ordinal).
-    """
-    # TODO: Sẽ implement logic thật ngày tiếp theo.
-    return df.copy()
-
-
-def scale_numeric(df: pd.DataFrame, skew_threshold: float = 0.75) -> pd.DataFrame:
-    """
-    Xử lý độ lệch (skewness) và chuẩn hóa (scaling) các biến số học.
-    
-    Args:
-        df (pd.DataFrame): DataFrame đầu vào.
-        skew_threshold (float): Ngưỡng độ lệch để áp dụng Log Transform.
-        
-    Returns:
-        pd.DataFrame: DataFrame mới đã được chuẩn hóa.
-    """
-    # TODO: Sẽ implement vào ngày tiếp theo.
-    return df.copy()
-
-
-def preprocess(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Hàm tổng hợp, chạy tuần tự toàn bộ pipeline tiền xử lý.
-    
-    Args:
-        df (pd.DataFrame): Dữ liệu thô ban đầu.
-        
-    Returns:
-        pd.DataFrame: Dữ liệu hoàn chỉnh sẵn sàng đưa vào mô hình.
-    """
-    df_clean = handle_missing_values(df)
-    df_feat = engineer_features(df_clean)
-    df_encoded = encode_categorical(df_feat)
-    return scale_numeric(df_encoded)
-
 # PHẦN 3: MODULE HÓA ENCODING, SCALING & PIPELINE HỢP NHẤT
 
 def build_preprocessing_pipeline(numeric_features: List[str], 
@@ -212,16 +168,16 @@ def preprocess_train(df: pd.DataFrame, num_cols: List[str], cat_cols: List[str],
     df_clean = handle_missing_values(df)
     df_feat = engineer_features(df_clean)
     
-    # Bước 2: Build sklearn pipeline
-    preprocessor = build_preprocessing_pipeline(num_cols, cat_cols, ord_cols)
+    # Kiểm tra an toàn: Đảm bảo các cột được khai báo thực sự tồn tại
+    all_required_cols = num_cols + cat_cols + ord_cols
+    missing_cols = [col for col in all_required_cols if col not in df_feat.columns]
+    if missing_cols:
+        raise ValueError(f"Các cột cấu hình cho Pipeline không tồn tại trong dữ liệu: {missing_cols}")
     
-    # Bước 3: Fit và Transform dữ liệu Train
-    # Quan trọng: fit_transform chỉ dùng cho tập train
+    preprocessor = build_preprocessing_pipeline(num_cols, cat_cols, ord_cols)
     X_processed = preprocessor.fit_transform(df_feat)
     
-    # Bước 4: Lưu Pipeline lại bằng joblib
     joblib.dump(preprocessor, save_path)
-    print(f"Pipeline đã được lưu tại: {save_path}")
     
     return X_processed
 
