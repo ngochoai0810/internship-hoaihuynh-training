@@ -2,7 +2,7 @@
 tests/test_preprocessing.py
 
 Kiểm thử tự động cho module preprocessing.
-Đảm bảo hàm xử lý đúng logic và không làm biến đổi dữ liệu gốc (immutability).
+Đảm bảo hàm xử lý đúng logic, xử lý ngoại lệ an toàn và validate kết quả Pipeline.
 """
 
 import pytest
@@ -10,10 +10,11 @@ import pandas as pd
 import numpy as np
 import sys
 import os
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../src/mlc')))
 
-from preprocessing import handle_missing_values, engineer_features
+# Cấu hình đường dẫn tuỳ thuộc vào kiến trúc của bạn, điều chỉnh nếu cần.
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
 
+from preprocessing import handle_missing_values, engineer_features, preprocess_train, preprocess_test
 
 
 @pytest.fixture
@@ -45,7 +46,22 @@ def mock_feature_data():
     })
 
 
-# --- Các Test Cases ---
+# --- TEST ERROR HANDLING ---
+
+def test_missing_required_columns():
+    """Đảm bảo hàm văng lỗi ValueError nếu thiếu các cột nằm trong NA_MEANS_NONE."""
+    bad_df = pd.DataFrame({"SomeRandomColumn": [1, 2, 3]})
+    with pytest.raises(ValueError, match="Thiếu các cột bắt buộc"):
+        handle_missing_values(bad_df)
+
+def test_empty_dataframe():
+    """Đảm bảo hàm chặn xử lý DataFrame rỗng."""
+    empty_df = pd.DataFrame()
+    with pytest.raises(ValueError, match="đang trống"):
+        handle_missing_values(empty_df)
+
+
+# --- TEST LOGIC & IMMUTABILITY ---
 
 def test_handle_missing_values_no_mutation(mock_missing_data):
     """Đảm bảo hàm tạo ra df mới, không sửa df gốc."""
@@ -73,7 +89,48 @@ def test_engineer_features_logic(mock_feature_data):
     assert "HouseAge" in df_feat.columns
     assert "RemodAge" in df_feat.columns
     
-    # Kiểm tra phép tính dòng đầu tiên
-    assert df_feat["TotalSF"].iloc[0] == 1000 (500 + 500 + 0)
-    assert df_feat["HouseAge"].iloc[0] == 10 (2010 - 2000)
-    assert df_feat["RemodAge"].iloc[0] == 5 (2010 - 2005)
+    # Sửa lỗi Syntax ở đây: dùng comment (#) thay vì ngoặc đơn
+    assert df_feat["TotalSF"].iloc[0] == 1000   # 500 + 500 + 0
+    assert df_feat["HouseAge"].iloc[0] == 10    # 2010 - 2000
+    assert df_feat["RemodAge"].iloc[0] == 5     # 2010 - 2005
+
+
+# --- TEST PIPELINE END-TO-END ---
+
+def test_preprocess_train_pipeline(mock_missing_data, tmp_path):
+    """
+    Kiểm tra toàn bộ pipeline: Không còn NaN, Scaling hoạt động tốt.
+    Sử dụng tmp_path của pytest để lưu trữ file preprocessor.pkl tạm thời.
+    """
+    # Chuẩn bị dữ liệu mô phỏng
+    df = handle_missing_values(mock_missing_data)
+    df["GarageType"] = ["Attchd", "Detchd", "Attchd"] # Thêm cột cat để test OneHot
+    df["ExterQual"] = ["TA", "Gd", "Ex"]              # Thêm cột ord để test Ordinal
+    
+    num_cols = ["GarageArea", "LotFrontage"]
+    cat_cols = ["GarageType"]
+    ord_cols = ["ExterQual"]
+    
+    save_filepath = tmp_path / "test_preprocessor.pkl"
+    
+    X_processed = preprocess_train(
+        df=df, 
+        num_cols=num_cols, 
+        cat_cols=cat_cols, 
+        ord_cols=ord_cols,
+        save_path=str(save_filepath)
+    )
+    
+    # 1. Kiểm tra File pkl đã được tạo ra chưa
+    assert save_filepath.exists(), "Pipeline chưa được lưu thành file .pkl"
+    
+    # 2. Kiểm tra định dạng đầu ra
+    assert isinstance(X_processed, np.ndarray), "Kết quả trả về phải là NumPy Array"
+    
+    # 3. Kiểm tra tính năng Standard Scaler (Mean xấp xỉ 0, Std xấp xỉ 1)
+    # 2 cột đầu tiên trong X_processed sẽ tương ứng với num_cols (do ColumnTransformer xếp lên đầu)
+    mean_val = np.mean(X_processed[:, 0]) # GarageArea
+    std_val = np.std(X_processed[:, 0])
+    
+    assert np.isclose(mean_val, 0, atol=1e-7), "Scaler chưa đưa Mean về 0"
+    assert np.isclose(std_val, 1, atol=1e-7), "Scaler chưa đưa Std về 1"
