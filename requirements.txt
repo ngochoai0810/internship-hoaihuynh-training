@@ -8,6 +8,7 @@ ast_serialize==0.6.0
 asttokens==3.0.1
 astunparse==1.6.3
 attrs==26.1.0
+black==26.5.1
 bleach==6.3.0
 certifi==2026.4.22
 charset-normalizer==3.4.7
@@ -86,6 +87,7 @@ referencing==0.37.0
 requests==2.33.1
 rich==15.0.0
 rpds-py==0.30.0
+ruff==0.15.22
 scikit-learn==1.8.0
 scipy==1.17.1
 setuptools==82.0.1

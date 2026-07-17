@@ -1,82 +1,70 @@
-"""
-src/preprocessing.py
+"""Preprocessing utilities for the Kaggle House Prices dataset."""
 
-- Ngày 11: Thiết kế bộ khung 
-- Ngày 12: Hiện thực hóa logic xử lý Missing Values & Feature Engineering.
-- Ngày 13: Module hóa Pipeline với Scikit-learn.
-- Ngày 14: Bổ sung Error Handling & Type Hint chuẩn xác.
-"""
-
-import pandas as pd
-import numpy as np
-from typing import List, Dict
-from sklearn.compose import ColumnTransformer
-from sklearn.preprocessing import StandardScaler, OneHotEncoder, OrdinalEncoder
-from sklearn.pipeline import Pipeline
 import joblib
+import numpy as np
+import pandas as pd
+from numpy.typing import NDArray
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder, StandardScaler
 
-# PHẦN 1: HẰNG SỐ 
-
-NA_MEANS_NONE: List[str] = [
-    "PoolQC", "Alley", "Fence", "FireplaceQu",
-    "GarageType", "GarageFinish", "GarageQual", "GarageCond",
-    "BsmtQual", "BsmtCond", "BsmtExposure", "BsmtFinType1", "BsmtFinType2",
+NA_MEANS_NONE: list[str] = [
+    "PoolQC",
+    "Alley",
+    "Fence",
+    "FireplaceQu",
+    "GarageType",
+    "GarageFinish",
+    "GarageQual",
+    "GarageCond",
+    "BsmtQual",
+    "BsmtCond",
+    "BsmtExposure",
+    "BsmtFinType1",
+    "BsmtFinType2",
     "MiscFeature",
 ]
 
-NUMERIC_ZEROS: List[str] = [
-    "GarageYrBlt", "GarageCars", "GarageArea",
-    "BsmtFinSF1", "BsmtFinSF2", "BsmtUnfSF",
-    "TotalBsmtSF", "BsmtFullBath", "BsmtHalfBath",
+NUMERIC_ZEROS: list[str] = [
+    "GarageYrBlt",
+    "GarageCars",
+    "GarageArea",
+    "BsmtFinSF1",
+    "BsmtFinSF2",
+    "BsmtUnfSF",
+    "TotalBsmtSF",
+    "BsmtFullBath",
+    "BsmtHalfBath",
 ]
 
-MEDIAN_FILL: List[str] = ["LotFrontage", "MasVnrArea"]
+MEDIAN_FILL: list[str] = ["LotFrontage", "MasVnrArea"]
 
-ORDINAL_MAP: Dict[str, int] = {"Po": 1, "Fa": 2, "TA": 3, "Gd": 4, "Ex": 5}
-ORDINAL_COLS: List[str] = ["ExterQual", "KitchenQual"]
-
-
-# PHẦN 2: THỰC THI LOGIC 
+ORDINAL_MAP: dict[str, int] = {"Po": 1, "Fa": 2, "TA": 3, "Gd": 4, "Ex": 5}
+ORDINAL_COLS: list[str] = ["ExterQual", "KitchenQual"]
 
 
 def handle_missing_values(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Xử lý các giá trị bị thiếu (Missing Values) trong tập dữ liệu.
-    (Ngày 11: Viết Docstring này + Type Hint)
-    
-    Args:
-        df (pd.DataFrame): DataFrame đầu vào chứa dữ liệu thô.
-        
-    Returns:
-        pd.DataFrame: DataFrame mới đã được xử lý toàn bộ giá trị bị thiếu.
-        
-    Raises:
-        ValueError: Nếu DataFrame đầu vào thiếu các cột bắt buộc.
-    """
+    """Fill missing values according to the House Prices EDA strategy."""
     if df.empty:
-        raise ValueError("Lỗi: DataFrame đầu vào đang trống (empty).")
+        raise ValueError("Input DataFrame is empty.")
 
     missing_required = [col for col in NA_MEANS_NONE if col not in df.columns]
     if missing_required:
-        raise ValueError(f"Thiếu các cột bắt buộc: {missing_required}")
+        raise ValueError(f"Missing required columns: {missing_required}")
 
     df_clean = df.copy()
 
-    # 1. NA mang ý nghĩa 'None'
     for col in NA_MEANS_NONE:
         df_clean[col] = df_clean[col].fillna("None")
 
-    # 2. NA mang ý nghĩa 0
     for col in NUMERIC_ZEROS:
         if col in df_clean.columns:
             df_clean[col] = df_clean[col].fillna(0)
 
-    # 3. Điền Median cho một số cột chỉ định
     for col in MEDIAN_FILL:
         if col in df_clean.columns:
             df_clean[col] = df_clean[col].fillna(df_clean[col].median())
 
-    # 4. Fallback: Xử lý các cột còn sót lại
     for col in df_clean.columns:
         if df_clean[col].isna().any():
             if pd.api.types.is_numeric_dtype(df_clean[col]):
@@ -90,114 +78,88 @@ def handle_missing_values(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Tạo các đặc trưng mới (Feature Engineering) dựa trên kiến thức miền.
-    
-    Args:
-        df (pd.DataFrame): DataFrame đã được xử lý missing values.
-        
-    Returns:
-        pd.DataFrame: DataFrame mới được bổ sung thêm các cột đặc trưng.
-    """
+    """Create reusable features identified during EDA."""
     df_feat = df.copy()
-    
-    # Cần có try-except hoặc kiểm tra cột tồn tại để tránh lỗi khi test
+
     if all(col in df_feat.columns for col in ["TotalBsmtSF", "1stFlrSF", "2ndFlrSF"]):
-        df_feat["TotalSF"] = df_feat["TotalBsmtSF"] + df_feat["1stFlrSF"] + df_feat["2ndFlrSF"]
-        
+        df_feat["TotalSF"] = (
+            df_feat["TotalBsmtSF"] + df_feat["1stFlrSF"] + df_feat["2ndFlrSF"]
+        )
+
     if all(col in df_feat.columns for col in ["YrSold", "YearBuilt"]):
         df_feat["HouseAge"] = df_feat["YrSold"] - df_feat["YearBuilt"]
-        
+
     if all(col in df_feat.columns for col in ["YrSold", "YearRemodAdd"]):
         df_feat["RemodAge"] = df_feat["YrSold"] - df_feat["YearRemodAdd"]
-        
+
     return df_feat
 
 
-# PHẦN 3: MODULE HÓA ENCODING, SCALING & PIPELINE HỢP NHẤT
-
-def build_preprocessing_pipeline(numeric_features: List[str], 
-                                 categorical_features: List[str], 
-                                 ordinal_features: List[str]) -> ColumnTransformer:
-    """
-    Xây dựng pipeline xử lý dữ liệu chuẩn Scikit-learn sử dụng ColumnTransformer.
-    
-    Args:
-        numeric_features: Danh sách các cột dạng số.
-        categorical_features: Danh sách các cột phân loại (One-Hot).
-        ordinal_features: Danh sách các cột phân loại có thứ bậc (Ordinal).
-        
-    Returns:
-        ColumnTransformer: Đối tượng chứa toàn bộ quy trình biến đổi.
-    """
-    # 1. Pipeline cho dữ liệu số (Chỉ cần Scaling vì missing value đã xử lý ở pandas)
-    numeric_transformer = Pipeline(steps=[
-        ('scaler', StandardScaler())
-    ])
-
-    # 2. Pipeline cho dữ liệu phân loại danh nghĩa (One-Hot Encoding)
-    categorical_transformer = Pipeline(steps=[
-        ('onehot', OneHotEncoder(handle_unknown='ignore', sparse_output=False))
-    ])
-
-    # 3. Pipeline cho dữ liệu phân loại thứ bậc (Ordinal Encoding)
-    # Lưu ý: Cần định nghĩa rõ các categories theo thứ tự từ thấp đến cao cho từng cột ordinal
-    ordinal_transformer = Pipeline(steps=[
-        ('ordinal', OrdinalEncoder(handle_unknown='use_encoded_value', unknown_value=-1))
-    ])
-
-    # 4. Gộp tất cả lại bằng ColumnTransformer
-    preprocessor = ColumnTransformer(
-        transformers=[
-            ('num', numeric_transformer, numeric_features),
-            ('cat', categorical_transformer, categorical_features),
-            ('ord', ordinal_transformer, ordinal_features)
-        ],
-        remainder='passthrough' # Giữ nguyên các cột không được chỉ định
+def build_preprocessing_pipeline(
+    numeric_features: list[str],
+    categorical_features: list[str],
+    ordinal_features: list[str],
+) -> ColumnTransformer:
+    """Build a sklearn ColumnTransformer for numeric and categorical features."""
+    numeric_transformer = Pipeline(steps=[("scaler", StandardScaler())])
+    categorical_transformer = Pipeline(
+        steps=[("onehot", OneHotEncoder(handle_unknown="ignore", sparse_output=False))]
+    )
+    ordinal_transformer = Pipeline(
+        steps=[
+            (
+                "ordinal",
+                OrdinalEncoder(handle_unknown="use_encoded_value", unknown_value=-1),
+            )
+        ]
     )
 
-    return preprocessor
+    return ColumnTransformer(
+        transformers=[
+            ("num", numeric_transformer, numeric_features),
+            ("cat", categorical_transformer, categorical_features),
+            ("ord", ordinal_transformer, ordinal_features),
+        ],
+        remainder="drop",
+    )
 
 
-def preprocess_train(df: pd.DataFrame, num_cols: List[str], cat_cols: List[str], ord_cols: List[str], save_path: str = "preprocessor.pkl") -> np.ndarray:
-    """
-    Pipeline dùng riêng cho quá trình Huấn luyện (Train).
-    Thực hiện fit_transform và lưu lại bộ biến đổi.
-    """
-    # Bước 1: Tiền xử lý bằng custom functions (Pandas)
+def preprocess_train(
+    df: pd.DataFrame,
+    num_cols: list[str],
+    cat_cols: list[str],
+    ord_cols: list[str],
+    save_path: str = "preprocessor.pkl",
+) -> NDArray[np.float64]:
+    """Fit preprocessing on train data, persist it, and return transformed data."""
     df_clean = handle_missing_values(df)
     df_feat = engineer_features(df_clean)
-    
-    # Kiểm tra an toàn: Đảm bảo các cột được khai báo thực sự tồn tại
+
     all_required_cols = num_cols + cat_cols + ord_cols
     missing_cols = [col for col in all_required_cols if col not in df_feat.columns]
     if missing_cols:
-        raise ValueError(f"Các cột cấu hình cho Pipeline không tồn tại trong dữ liệu: {missing_cols}")
-    
+        raise ValueError(f"Configured pipeline columns are missing: {missing_cols}")
+
     preprocessor = build_preprocessing_pipeline(num_cols, cat_cols, ord_cols)
-    X_processed = preprocessor.fit_transform(df_feat)
-    
+    x_processed = preprocessor.fit_transform(df_feat)
+
     joblib.dump(preprocessor, save_path)
-    
-    return X_processed
+
+    return np.asarray(x_processed, dtype=np.float64)
 
 
-def preprocess_test(df: pd.DataFrame, load_path: str = "preprocessor.pkl") -> np.ndarray:
-    """
-    Pipeline dùng cho quá trình Kiểm thử (Test) hoặc Suy diễn (Inference).
-    Chỉ thực hiện transform, không học (fit) thêm từ dữ liệu.
-    """
-    # Bước 1: Tiền xử lý bằng custom functions (Pandas)
+def preprocess_test(
+    df: pd.DataFrame, load_path: str = "preprocessor.pkl"
+) -> NDArray[np.float64]:
+    """Load a fitted preprocessor and transform test or inference data."""
     df_clean = handle_missing_values(df)
     df_feat = engineer_features(df_clean)
-    
-    # Bước 2: Load pipeline đã học từ tập Train
+
     try:
         preprocessor = joblib.load(load_path)
-    except FileNotFoundError:
-        raise ValueError(f"Không tìm thấy file {load_path}. Hãy chạy preprocess_train trước!")
-        
-    # Bước 3: Chỉ Transform (Tuyệt đối KHÔNG fit_transform ở bước này)
-    X_processed = preprocessor.transform(df_feat)
-    
-    return X_processed
+    except FileNotFoundError as exc:
+        raise ValueError(f"Preprocessor file not found: {load_path}") from exc
+
+    x_processed = preprocessor.transform(df_feat)
+
+    return np.asarray(x_processed, dtype=np.float64)
