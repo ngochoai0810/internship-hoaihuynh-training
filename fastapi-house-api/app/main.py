@@ -14,6 +14,6 @@ app.include_router(houses.router, prefix=settings.api_v1_prefix)
 app.include_router(users.router, prefix=settings.api_v1_prefix)
 
 
-@app.get("/health", tags=["health"])
-def health_check() -> dict[str, str]:
-    return {"status": "ok"}
+@app.get("/", tags=["root"])
+def read_root() -> dict[str, str]:
+    return {"message": "House Price API"}

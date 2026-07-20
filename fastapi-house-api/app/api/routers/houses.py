@@ -12,8 +12,8 @@ MOCK_HOUSES = [
 
 
 @router.get("/", response_model=list[HouseResponse])
-def list_houses() -> list[HouseResponse]:
-    return MOCK_HOUSES
+def list_houses(limit: int = 10) -> list[HouseResponse]:
+    return MOCK_HOUSES[:limit]
 
 
 @router.get("/{house_id}", response_model=HouseResponse)
