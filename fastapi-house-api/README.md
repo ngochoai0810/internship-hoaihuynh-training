@@ -35,4 +35,12 @@ pytest
 - Add mock routers for houses and users.
 - Add TestClient coverage for house endpoints.
 
+## FastAPI Notes
+
+- FastAPI builds `/docs` from route decorators, type hints, and response models.
+- `house_id: int` tells FastAPI to validate the path parameter as an integer.
+- Calling `/api/v1/houses/abc` returns `422` because `abc` cannot be parsed as an integer.
+- Pydantic handles validation and serialization for request and response data.
+- Starlette provides the ASGI foundation that lets FastAPI run efficiently with async I/O.
+
 Database models, authentication, and ML integration are intentionally left for later weeks.
