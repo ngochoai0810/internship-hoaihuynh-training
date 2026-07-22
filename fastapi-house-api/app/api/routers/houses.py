@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Query, status
 
 from app.schemas.house import HouseCreate, HouseResponse, HouseUpdate
 
@@ -12,8 +12,17 @@ MOCK_HOUSES = {
 
 
 @router.get("/", response_model=list[HouseResponse])
-def list_houses(limit: int = 10) -> list[dict[str, object]]:
-    return list(MOCK_HOUSES.values())[:limit]
+def list_houses(
+    limit: int = Query(default=10, gt=0),
+    min_price: float | None = Query(default=None, ge=0),
+    max_rooms: int | None = Query(default=None, gt=0),
+) -> list[dict[str, object]]:
+    results = list(MOCK_HOUSES.values())
+    if min_price is not None:
+        results = [house for house in results if house["price"] >= min_price]
+    if max_rooms is not None:
+        results = [house for house in results if house["rooms"] <= max_rooms]
+    return results[:limit]
 
 
 @router.get("/{house_id}", response_model=HouseResponse)
