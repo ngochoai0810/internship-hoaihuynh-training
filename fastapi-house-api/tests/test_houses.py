@@ -34,6 +34,30 @@ def test_create_house_returns_created_house() -> None:
     }
 
 
+def test_list_houses_filters_by_query_params() -> None:
+    response = client.get("/api/v1/houses/?min_price=200000&max_rooms=3")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert len(payload) == 1
+    assert payload[0]["id"] == 1
+    assert payload[0]["price"] >= 200000
+    assert payload[0]["rooms"] <= 3
+
+
+def test_update_house_only_changes_sent_fields() -> None:
+    response = client.patch("/api/v1/houses/1", json={"price": 260000.0})
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "id": 1,
+        "area": 120.5,
+        "rooms": 3,
+        "location": "District 1",
+        "price": 260000.0,
+    }
+
+
 def test_get_house_rejects_non_integer_path_param() -> None:
     response = client.get("/api/v1/houses/abc")
 
