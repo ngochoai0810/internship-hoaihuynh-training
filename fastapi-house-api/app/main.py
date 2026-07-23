@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 
-from app.api.routers import houses, users
+from app.api.routers import houses, predict, users
 from app.core.config import settings
 
 
@@ -11,6 +11,7 @@ app = FastAPI(
 )
 
 app.include_router(houses.router, prefix=settings.api_v1_prefix)
+app.include_router(predict.router, prefix=settings.api_v1_prefix)
 app.include_router(users.router, prefix=settings.api_v1_prefix)
 
 
