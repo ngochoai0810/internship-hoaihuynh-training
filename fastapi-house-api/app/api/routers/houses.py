@@ -11,7 +11,7 @@ MOCK_HOUSES = {
 }
 
 
-@router.get("/", response_model=list[HouseResponse])
+@router.get("", response_model=list[HouseResponse])
 def list_houses(
     limit: int = Query(default=10, gt=0),
     min_price: float | None = Query(default=None, ge=0),
@@ -33,7 +33,7 @@ def get_house(house_id: int) -> dict[str, object]:
     return house
 
 
-@router.post("/", response_model=HouseResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=HouseResponse, status_code=status.HTTP_201_CREATED)
 def create_house(payload: HouseCreate) -> dict[str, object]:
     return {"id": 3, "price": 0.0, **payload.model_dump()}
 
