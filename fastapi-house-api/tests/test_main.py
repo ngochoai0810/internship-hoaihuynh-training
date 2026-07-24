@@ -55,3 +55,19 @@ def test_unversioned_predict_alias_works() -> None:
 
     assert response.status_code == 200
     assert set(response.json()) == {"predicted_price", "currency"}
+
+
+def test_user_read_skeleton_routes_work() -> None:
+    list_response = client.get("/users")
+    get_response = client.get("/users/1")
+    missing_response = client.get("/users/999")
+    versioned_response = client.get("/api/v1/users/1")
+
+    assert list_response.status_code == 200
+    assert list_response.json()[0]["id"] == 1
+    assert get_response.status_code == 200
+    assert get_response.json()["email"] == "intern@example.com"
+    assert missing_response.status_code == 404
+    assert missing_response.json()["detail"] == "User not found"
+    assert versioned_response.status_code == 200
+    assert versioned_response.json()["id"] == 1
