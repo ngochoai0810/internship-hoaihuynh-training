@@ -26,13 +26,30 @@ From this directory:
 
 ## API Overview
 
-- `GET /` returns a basic health message.
-- `GET /api/v1/houses/` lists mock houses and supports `limit`, `min_price`, and `max_rooms`.
-- `GET /api/v1/houses/{house_id}` returns one mock house by path parameter.
-- `POST /api/v1/houses/` creates a mock house response.
-- `PATCH /api/v1/houses/{house_id}` partially updates a mock house.
-- `GET /api/v1/users/me` returns the current mock user.
-- `POST /api/v1/users/` creates a mock user response.
+Primary routes use the `/api/v1` prefix. Day 20 compatibility aliases are also exposed
+without the version prefix for router and CRUD skeleton practice.
+
+| Method | Primary Endpoint | Day 20 Alias | Purpose |
+|--------|------------------|--------------|---------|
+| GET | `/` | - | Basic API welcome message |
+| GET | `/health` | - | Fast process health check |
+| GET | `/api/v1/houses` | `/houses` | List mock houses with `limit`, `min_price`, and `max_rooms` filters |
+| GET | `/api/v1/houses/{house_id}` | `/houses/{house_id}` | Get one mock house by id |
+| POST | `/api/v1/houses` | `/houses` | Create a mock house response |
+| PATCH | `/api/v1/houses/{house_id}` | `/houses/{house_id}` | Partially update a mock house |
+| GET | `/api/v1/users` | `/users` | List mock users |
+| GET | `/api/v1/users/me` | `/users/me` | Return the current mock user |
+| GET | `/api/v1/users/{user_id}` | `/users/{user_id}` | Get one mock user by id |
+| POST | `/api/v1/users` | `/users` | Create a mock user response |
+| POST | `/api/v1/predict` | `/predict` | Return a mock house price prediction |
+
+Routes are grouped by domain tags in `/docs`.
+
+## CORS
+
+The API allows browser requests from Streamlit at `http://localhost:8501` with
+credentials, all methods, and all headers. This supports the future Streamlit frontend
+without allowing every origin.
 
 ## Schema Pattern
 
