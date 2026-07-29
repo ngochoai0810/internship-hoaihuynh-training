@@ -34,9 +34,12 @@ ORM and Alembic migrations.
 ```text
 internship-hoaihuynh-training/
 |-- orm_migrations/
+|   |-- alembic/
+|   |-- alembic.ini
+|   |-- app.db
 |   |-- docs/
 |   |   |-- README.md
-|   |   `-- orm-setup.md
+|   |   `-- orm_setup.md
 |   |-- scripts/
 |   |   `-- init_db.py
 |   |-- src/
@@ -45,8 +48,7 @@ internship-hoaihuynh-training/
 |   |       `-- house.py
 |   `-- tests/
 |       `-- test_orm_setup.py
-|-- app.db
-`-- alembic.ini
+`-- Readme.md
 ```
 
 `orm_migrations/docs/` has learning notes only. Real code is in
