@@ -30,7 +30,8 @@ clear for SQLAlchemy and useful for type checkers.
 The project uses the local SQLite file `app.db` for practice. This file is a
 local artifact and should not be committed to Git.
 
-Run this command from the repo root to create the database file:
+Run this command from the repo root to create the database file inside
+`orm_migrations/`:
 
 ```powershell
 .\.venv\Scripts\python.exe .\orm_migrations\scripts\init_db.py
