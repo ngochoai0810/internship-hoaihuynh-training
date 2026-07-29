@@ -1,11 +1,13 @@
 """SQLAlchemy database connection and session setup."""
 
 from collections.abc import Generator
+from pathlib import Path
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
-SQLALCHEMY_DATABASE_URL = "sqlite:///./app.db"
+ORM_MIGRATIONS_ROOT = Path(__file__).resolve().parents[1]
+SQLALCHEMY_DATABASE_URL = f"sqlite:///{(ORM_MIGRATIONS_ROOT / 'app.db').as_posix()}"
 
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL,

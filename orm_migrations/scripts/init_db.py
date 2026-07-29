@@ -4,9 +4,10 @@ from pathlib import Path
 import os
 import sys
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+ORM_MIGRATIONS_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = ORM_MIGRATIONS_ROOT.parent
 sys.path.insert(0, str(REPO_ROOT))
-os.chdir(REPO_ROOT)
+os.chdir(ORM_MIGRATIONS_ROOT)
 
 from orm_migrations.src.database import engine
 from orm_migrations.src.models import Base
