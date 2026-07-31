@@ -3,6 +3,7 @@ app.db
 __pycache__/
 **/__pycache__/
 .pytest_cache/
+.pytest-tmp/
 *.pyc
 .agents
 .venv
