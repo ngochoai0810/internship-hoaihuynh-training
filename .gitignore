@@ -1,10 +1,14 @@
+app.db
+*.db
+__pycache__/
+**/__pycache__/
+.pytest_cache/
+.pytest-tmp/
+*.pyc
 venv/
 .venv/
-__pycache__/
-*.pyc
 *.pyo
 *.pyd
-.pytest_cache/
 .mypy_cache/
 .ruff_cache/
 .idea/

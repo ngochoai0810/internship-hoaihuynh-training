@@ -34,7 +34,7 @@ def test_cors_allows_streamlit_origin() -> None:
     assert response.headers["access-control-allow-origin"] == "http://localhost:8501"
 
 
-def test_unversioned_house_aliases_work() -> None:
+def test_unversioned_house_aliases_work(client: TestClient) -> None:
     list_response = client.get("/houses?limit=1")
     get_response = client.get("/houses/1")
     create_response = client.post(
