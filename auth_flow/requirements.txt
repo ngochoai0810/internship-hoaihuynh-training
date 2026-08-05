@@ -4,4 +4,6 @@ pyjwt
 python-dotenv
 pytest
 python-multipart
+pydantic[email]
+httpx
 uvicorn[standard]
