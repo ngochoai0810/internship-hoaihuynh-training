@@ -7,3 +7,5 @@ python-multipart
 pydantic[email]
 httpx
 uvicorn[standard]
+streamlit>=1.38
+requests>=2.32
