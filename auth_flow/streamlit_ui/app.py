@@ -75,6 +75,43 @@ def login_user(email: str, password: str) -> tuple[bool, str]:
     return False, extract_error_detail(response)
 
 
+def get_current_user_profile() -> tuple[bool, str, dict | None]:
+    """Call GET /me with the bearer token stored in Streamlit session state."""
+    token = st.session_state.get("token")
+    if not token:
+        return (
+            False,
+            "No access token found. Please log in before calling /me.",
+            None,
+        )
+
+    headers = {"Authorization": f"Bearer {token}"}
+    try:
+        response = requests.get(
+            f"{API_URL}/me",
+            headers=headers,
+            timeout=REQUEST_TIMEOUT,
+        )
+    except requests.exceptions.RequestException:
+        return (
+            False,
+            f"Cannot connect to backend at {API_URL}. Is the FastAPI server running?",
+            None,
+        )
+
+    if response.status_code == 200:
+        return True, "Protected /me request successful.", response.json()
+
+    if response.status_code == 401:
+        return (
+            False,
+            "Unauthorized. The token is missing, invalid, or expired.",
+            None,
+        )
+
+    return False, extract_error_detail(response), None
+
+
 def render_auth_forms() -> None:
     """Render registration and login forms side by side."""
     col_register, col_login = st.columns(2)
@@ -121,12 +158,20 @@ def render_auth_forms() -> None:
 
 
 def render_logged_in_view() -> None:
-    """Render logged-in state and logout action."""
+    """Render logged-in state, protected profile lookup, and logout action."""
     st.success(f"Logged in as: **{st.session_state['email']}**")
 
     token = st.session_state["token"]
     if token:
         st.caption(f"Access token: `{token[:20]}...`")
+
+    if st.button("Call /me"):
+        ok, message, profile = get_current_user_profile()
+        if ok and profile is not None:
+            st.success(message)
+            st.json(profile)
+        else:
+            st.error(message)
 
     if st.button("Logout"):
         st.session_state["token"] = None
