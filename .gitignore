@@ -18,6 +18,6 @@ venv/
 .agent/
 data/
 my-project/artifacts/
-fastapi-house-api/data/
+my-project/models/
 *.csv
 *.zip
