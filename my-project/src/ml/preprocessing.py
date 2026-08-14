@@ -4,9 +4,11 @@ import joblib
 import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
+from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder, StandardScaler
+from sklearn.utils.validation import check_is_fitted
 
 NA_MEANS_NONE: list[str] = [
     "PoolQC",
@@ -41,6 +43,77 @@ MEDIAN_FILL: list[str] = ["LotFrontage", "MasVnrArea"]
 
 ORDINAL_MAP: dict[str, int] = {"Po": 1, "Fa": 2, "TA": 3, "Gd": 4, "Ex": 5}
 ORDINAL_COLS: list[str] = ["ExterQual", "KitchenQual"]
+ORDINAL_QUALITY_ORDER: list[str] = ["Po", "Fa", "TA", "Gd", "Ex"]
+
+
+class HousePricesMissingValueImputer(BaseEstimator, TransformerMixin):
+    """Fit House Prices missing-value rules on train data only."""
+
+    def __init__(self, none_columns: list[str] | None = None) -> None:
+        self.none_columns = none_columns
+
+    def fit(
+        self, X: pd.DataFrame, y: object | None = None
+    ) -> "HousePricesMissingValueImputer":
+        """Learn train-only fill values for columns present in the input."""
+        if not isinstance(X, pd.DataFrame):
+            raise TypeError("HousePricesMissingValueImputer expects a DataFrame.")
+
+        none_columns = (
+            self.none_columns if self.none_columns is not None else NA_MEANS_NONE
+        )
+        self.columns_: list[str] = list(X.columns)
+        self.none_columns_: list[str] = [
+            col for col in none_columns if col in X.columns
+        ]
+        self.numeric_medians_: dict[str, float] = {}
+        self.categorical_modes_: dict[str, str] = {}
+
+        for col in X.columns:
+            if col in self.none_columns_:
+                continue
+
+            if pd.api.types.is_numeric_dtype(X[col]):
+                median_value = X[col].median()
+                self.numeric_medians_[col] = (
+                    0.0 if pd.isna(median_value) else float(median_value)
+                )
+                continue
+
+            mode_values = X[col].mode(dropna=True)
+            fallback_value = "TA" if col in ORDINAL_COLS else "None"
+            self.categorical_modes_[col] = (
+                fallback_value if mode_values.empty else str(mode_values.iloc[0])
+            )
+
+        return self
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        """Fill missing values using values learned during fit."""
+        check_is_fitted(self, "columns_")
+
+        if not isinstance(X, pd.DataFrame):
+            raise TypeError("HousePricesMissingValueImputer expects a DataFrame.")
+
+        missing_cols = [col for col in self.columns_ if col not in X.columns]
+        if missing_cols:
+            raise ValueError(f"Missing columns during transform: {missing_cols}")
+
+        df_clean = X.copy()
+
+        for col in self.none_columns_:
+            if col in df_clean.columns:
+                df_clean[col] = df_clean[col].fillna("None")
+
+        for col, numeric_fill_value in self.numeric_medians_.items():
+            if col in df_clean.columns:
+                df_clean[col] = df_clean[col].fillna(numeric_fill_value)
+
+        for col, categorical_fill_value in self.categorical_modes_.items():
+            if col in df_clean.columns:
+                df_clean[col] = df_clean[col].fillna(categorical_fill_value)
+
+        return df_clean
 
 
 def handle_missing_values(df: pd.DataFrame) -> pd.DataFrame:
@@ -105,11 +178,16 @@ def build_preprocessing_pipeline(
     categorical_transformer = Pipeline(
         steps=[("onehot", OneHotEncoder(handle_unknown="ignore", sparse_output=False))]
     )
+    ordinal_categories = [ORDINAL_QUALITY_ORDER.copy() for _ in ordinal_features]
     ordinal_transformer = Pipeline(
         steps=[
             (
                 "ordinal",
-                OrdinalEncoder(handle_unknown="use_encoded_value", unknown_value=-1),
+                OrdinalEncoder(
+                    categories=ordinal_categories,
+                    handle_unknown="use_encoded_value",
+                    unknown_value=-1,
+                ),
             )
         ]
     )
