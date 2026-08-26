@@ -19,5 +19,8 @@ venv/
 data/
 my-project/artifacts/
 my-project/models/
+my-project/model.pkl
+my-project/model_metadata.json
+my-project/.env
 *.csv
 *.zip
