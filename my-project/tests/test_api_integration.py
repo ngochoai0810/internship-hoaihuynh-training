@@ -52,6 +52,16 @@ class FailingModel:
         raise ValueError("inference failed")
 
 
+class OverflowingModel:
+    def predict(self, frame: pd.DataFrame) -> np.ndarray:
+        return np.array([1_000.0])
+
+
+class NegativePriceModel:
+    def predict(self, frame: pd.DataFrame) -> np.ndarray:
+        return np.array([-1.0])
+
+
 def _settings(tmp_path: Path, model_path: Path) -> Settings:
     return Settings(
         secret_key="test-secret-key-that-is-long-enough",
@@ -172,6 +182,38 @@ def test_inference_error_does_not_create_history(tmp_path: Path) -> None:
         assert session.scalar(select(func.count(PredictionHistory.id))) == 0
 
 
+def test_inverse_transform_overflow_does_not_create_history(tmp_path: Path) -> None:
+    app, _ = _create_test_app(tmp_path, OverflowingModel())
+
+    with TestClient(app, raise_server_exceptions=False) as client:
+        token = _register_and_login(client)
+        response = client.post(
+            "/api/v1/predict",
+            json=VALID_PREDICTION,
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    assert response.status_code == 500
+    with app.state.session_factory() as session:
+        assert session.scalar(select(func.count(PredictionHistory.id))) == 0
+
+
+def test_negative_price_does_not_create_history(tmp_path: Path) -> None:
+    app, _ = _create_test_app(tmp_path, NegativePriceModel())
+
+    with TestClient(app, raise_server_exceptions=False) as client:
+        token = _register_and_login(client)
+        response = client.post(
+            "/api/v1/predict",
+            json=VALID_PREDICTION,
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    assert response.status_code == 500
+    with app.state.session_factory() as session:
+        assert session.scalar(select(func.count(PredictionHistory.id))) == 0
+
+
 def test_database_error_rolls_back_prediction_history(tmp_path: Path) -> None:
     app, _ = _create_test_app(tmp_path, InspectingModel(208_500.0))
     with app.state.session_factory() as session:
@@ -273,3 +315,19 @@ def test_invalid_prediction_payload_is_rejected(tmp_path: Path) -> None:
     assert response.status_code == 422
     with app.state.session_factory() as session:
         assert session.scalar(select(func.count(PredictionHistory.id))) == 0
+
+
+def test_registration_rejects_password_beyond_bcrypt_byte_limit(
+    tmp_path: Path,
+) -> None:
+    app, _ = _create_test_app(tmp_path, InspectingModel(208_500.0))
+
+    with TestClient(app, raise_server_exceptions=False) as client:
+        response = client.post(
+            "/api/v1/auth/register",
+            json={"email": "long-password@example.com", "password": "x" * 73},
+        )
+
+    assert response.status_code == 422
+    with app.state.session_factory() as session:
+        assert session.scalar(select(func.count(User.id))) == 0

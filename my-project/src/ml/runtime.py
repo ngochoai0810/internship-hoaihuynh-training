@@ -55,4 +55,8 @@ def predict_price(model: PredictionModel, payload: PredictionInput) -> float:
     prediction = np.asarray(model.predict(build_model_frame(payload)), dtype=float)
     if prediction.shape != (1,) or not np.isfinite(prediction[0]):
         raise ValueError("Model returned an invalid prediction")
-    return round(float(np.expm1(prediction[0])), 2)
+    with np.errstate(over="ignore", invalid="ignore"):
+        price = float(np.expm1(prediction[0]))
+    if not np.isfinite(price) or price < 0:
+        raise ValueError("Model returned an invalid price")
+    return round(price, 2)

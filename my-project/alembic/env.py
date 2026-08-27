@@ -1,9 +1,9 @@
 """Alembic migration environment for the consolidated Week 9 app."""
 
 from logging.config import fileConfig
-from pathlib import Path
 
 from alembic import context
+from core.config import Settings
 from models import Base
 from sqlalchemy import engine_from_config, pool
 
@@ -18,8 +18,7 @@ def database_url() -> str:
     configured_url = config.get_main_option("sqlalchemy.url")
     if configured_url:
         return configured_url
-    config_path = Path(config.config_file_name or "alembic.ini").resolve()
-    return f"sqlite:///{(config_path.parent / 'app.db').as_posix()}"
+    return Settings().database_url
 
 
 def run_migrations_offline() -> None:

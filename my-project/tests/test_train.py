@@ -204,6 +204,7 @@ def test_cli_runs_with_temp_csv(
 ) -> None:
     data_path = tmp_path / "train.csv"
     artifacts_dir = tmp_path / "artifacts"
+    model_path = tmp_path / "model.pkl"
     reduced_training_data.to_csv(data_path, index=False)
 
     result = train_module.main(
@@ -212,6 +213,8 @@ def test_cli_runs_with_temp_csv(
             str(data_path),
             "--artifacts-dir",
             str(artifacts_dir),
+            "--model-path",
+            str(model_path),
             "--model",
             "ridge",
             "--alpha",
@@ -225,7 +228,8 @@ def test_cli_runs_with_temp_csv(
         ]
     )
 
-    assert Path(result["model_artifact_path"]).exists()
+    assert result["model_artifact_path"] == str(model_path)
+    assert model_path.exists()
     assert Path(result["experiments_path"]).exists()
     assert np.isfinite(result["rmse_log"])
 
