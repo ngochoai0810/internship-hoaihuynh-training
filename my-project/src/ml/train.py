@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
+import tempfile
 from collections.abc import Sequence
 from datetime import datetime
 from pathlib import Path
@@ -30,6 +31,7 @@ LOGGER = logging.getLogger(__name__)
 PROJECT_DIR = Path(__file__).resolve().parents[2]
 DEFAULT_DATA_PATH = PROJECT_DIR / "data" / "raw" / "train.csv"
 DEFAULT_ARTIFACTS_DIR = PROJECT_DIR / "artifacts"
+DEFAULT_MODEL_PATH = PROJECT_DIR / "model.pkl"
 
 TARGET_COLUMN = "SalePrice"
 NUMERIC_FEATURES = ["LotFrontage", "MasVnrArea", "TotalBsmtSF"]
@@ -163,6 +165,25 @@ def _unique_path(path: Path) -> Path:
         counter += 1
 
 
+def _atomic_dump(pipeline: Pipeline, model_path: Path) -> None:
+    """Replace a model artifact only after serialization succeeds."""
+
+    model_path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(
+        dir=model_path.parent,
+        prefix=f".{model_path.name}.",
+        suffix=".tmp",
+        delete=False,
+    ) as temporary_file:
+        temporary_path = Path(temporary_file.name)
+
+    try:
+        joblib.dump(pipeline, temporary_path)
+        temporary_path.replace(model_path)
+    finally:
+        temporary_path.unlink(missing_ok=True)
+
+
 def save_artifacts(
     pipeline: Pipeline,
     metrics: dict[str, float],
@@ -193,7 +214,7 @@ def save_artifacts(
         model_path = Path(model_path)
         model_path.parent.mkdir(parents=True, exist_ok=True)
 
-    joblib.dump(pipeline, model_path)
+    _atomic_dump(pipeline, model_path)
 
     row = {
         "timestamp": run_timestamp.isoformat(timespec="seconds"),
@@ -229,7 +250,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data-path", type=Path, default=DEFAULT_DATA_PATH)
     parser.add_argument("--artifacts-dir", type=Path, default=DEFAULT_ARTIFACTS_DIR)
-    parser.add_argument("--model-path", type=Path, default=None)
+    parser.add_argument("--model-path", type=Path, default=DEFAULT_MODEL_PATH)
     parser.add_argument("--experiments-path", type=Path, default=None)
     parser.add_argument("--model", choices=MODEL_CHOICES, default=DEFAULT_MODEL)
     parser.add_argument("--alpha", type=float, default=DEFAULT_ALPHA)
