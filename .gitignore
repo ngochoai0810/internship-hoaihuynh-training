@@ -16,6 +16,7 @@ venv/
 .agents/
 .agents
 .agent/
+.worktrees/
 data/
 my-project/artifacts/
 my-project/models/
