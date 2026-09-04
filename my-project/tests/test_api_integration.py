@@ -155,6 +155,72 @@ def test_authenticated_prediction_is_persisted(tmp_path: Path) -> None:
         assert history.user.email == "week9@example.com"
 
 
+def test_prediction_history_returns_only_current_users_latest_records(
+    tmp_path: Path,
+) -> None:
+    app, _ = _create_test_app(tmp_path, InspectingModel(208_500.0))
+
+    with TestClient(app) as client:
+        token = _register_and_login(client)
+        headers = {"Authorization": f"Bearer {token}"}
+        first = client.post("/api/v1/predict", json=VALID_PREDICTION, headers=headers)
+        second = client.post(
+            "/api/v1/predict",
+            json={**VALID_PREDICTION, "lot_frontage": 88.0},
+            headers=headers,
+        )
+        assert first.status_code == 201
+        assert second.status_code == 201
+
+        with app.state.session_factory() as session:
+            other_user = User(
+                email="other@example.com",
+                hashed_password="not-used-by-this-test",
+            )
+            session.add(other_user)
+            session.flush()
+            session.add(
+                PredictionHistory(
+                    user_id=other_user.id,
+                    input_payload=VALID_PREDICTION,
+                    predicted_price=999_999.0,
+                    model_sha256="b" * 64,
+                )
+            )
+            session.commit()
+
+        response = client.get(
+            "/api/v1/predictions/history?limit=1",
+            headers=headers,
+        )
+
+    assert response.status_code == 200
+    assert len(response.json()) == 1
+    latest = response.json()[0]
+    assert latest["id"] == second.json()["prediction_history_id"]
+    assert latest["input_payload"]["lot_frontage"] == 88.0
+    assert latest["predicted_price"] == 208_500.0
+    assert latest["model_sha256"] == second.json()["model_sha256"]
+    assert isinstance(latest["created_at"], str)
+
+
+def test_prediction_history_requires_authentication_and_valid_limit(
+    tmp_path: Path,
+) -> None:
+    app, _ = _create_test_app(tmp_path, InspectingModel(208_500.0))
+
+    with TestClient(app) as client:
+        missing_token = client.get("/api/v1/predictions/history")
+        token = _register_and_login(client)
+        invalid_limit = client.get(
+            "/api/v1/predictions/history?limit=0",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    assert missing_token.status_code == 401
+    assert invalid_limit.status_code == 422
+
+
 def test_missing_token_does_not_create_history(tmp_path: Path) -> None:
     app, _ = _create_test_app(tmp_path, InspectingModel(208_500.0))
 

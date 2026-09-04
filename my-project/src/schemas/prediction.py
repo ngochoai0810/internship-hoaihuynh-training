@@ -1,8 +1,9 @@
 """Live house-price prediction contracts."""
 
+from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class PredictionInput(BaseModel):
@@ -19,6 +20,16 @@ class PredictionResponse(BaseModel):
     predicted_price: float
     currency: str = "USD"
     model_sha256: str
+
+
+class PredictionHistoryResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    input_payload: dict[str, object]
+    predicted_price: float
+    model_sha256: str
+    created_at: datetime
 
 
 class HealthResponse(BaseModel):
