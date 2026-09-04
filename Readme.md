@@ -71,6 +71,9 @@ Register and log in at `http://localhost:8501`. Streamlit retains the returned
 JWT in session state and sends it as `Authorization: Bearer <token>` when it
 calls `POST /api/v1/predict`.
 
+The dashboard includes overview, holdout comparison, paced load testing, and
+authenticated prediction history.
+
 ## API Contract
 
 Protected prediction request:
@@ -92,6 +95,7 @@ Routes:
 - `POST /api/v1/auth/login`
 - `GET /api/v1/auth/me`
 - `POST /api/v1/predict`
+- `GET /api/v1/predictions/history`
 - `GET /health`
 
 Successful predictions are inverse-transformed with `expm1` and saved to
