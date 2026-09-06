@@ -1,60 +1,122 @@
-# Internship - Model Training
+# Week 9 - ML Model Integration & Retrain Simulation
 
-## Overview
+This branch consolidates the house-price ML pipeline, FastAPI backend,
+database-backed JWT authentication, prediction history, and Streamlit client
+inside `my-project`.
 
-This branch contains the machine learning training work for the Kaggle House
-Prices workflow. It keeps the reusable preprocessing project and removes the
-backend/authentication milestone folders so the branch can focus on notebook
-training, model evaluation, and script conversion.
-
-## Repository Structure
+## Structure
 
 ```text
-internship-hoaihuynh-training/
-|-- my-project/            # ML preprocessing, notebooks, tests, and training code
-|-- .env.example           # Root example environment file
-|-- .gitignore             # Ignored local data, caches, and generated artifacts
-|-- pyproject.toml         # pytest, mypy, black, and ruff config
-|-- requirements.txt       # ML, notebook, and test dependencies
-`-- README.md              # Branch overview
+my-project/
+|-- alembic/                    # Database migrations
+|-- data/                       # Local/ignored training data
+|-- src/
+|   |-- api/                    # FastAPI app and routes
+|   |-- core/                   # Settings and JWT/password security
+|   |-- dependencies/           # FastAPI auth dependencies
+|   |-- ml/                     # Preprocessing, training, runtime loading
+|   |-- models/                 # SQLAlchemy entities
+|   |-- schemas/                # API contracts
+|   |-- scripts/                # Deterministic retrain subset helper
+|   `-- streamlit_app/          # Streamlit UI and HTTP client
+`-- tests/                      # Unit and integration tests
 ```
 
-## Week 7 Focus
-
-- Reuse `my-project/src/ml/preprocessing.py` instead of copying preprocessing
-  logic.
-- Create training notebooks for train/test split, baseline linear regression,
-  Ridge regression, and model evaluation.
-- Convert notebook logic into a standalone `my-project/src/ml/train.py` script.
-- Save the first fitted model artifact with `joblib`, for example under
-  `my-project/models/model.pkl`.
-
-## Useful Paths
-
-- `my-project/notebooks/`: exploratory and training notebooks.
-- `my-project/src/ml/preprocessing.py`: reusable preprocessing helpers.
-- `my-project/src/run_pipeline.py`: preprocessing pipeline entrypoint.
-- `my-project/tests/`: preprocessing tests and edge-case coverage.
+Generated CSV files, SQLite databases, experiment artifacts, `.env`, and
+`my-project/model.pkl` are intentionally not committed.
 
 ## Setup
 
+From the repository root in PowerShell:
+
 ```powershell
 python -m venv .venv
-.\.venv\Scripts\activate
+.\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
 pip install -r requirements.txt
+pip install -e .
+Copy-Item .env.example .env
+alembic -c my-project/alembic.ini upgrade head
 ```
 
-## Checks
+Replace `SECRET_KEY` in `.env` before using the app outside local practice.
+
+## Train the Initial Model
+
+The API deliberately fails during startup when `model.pkl` is missing,
+corrupt, or does not expose `predict()`.
+
+```powershell
+python my-project/src/ml/train.py
+```
+
+The command trains the existing Ridge pipeline, appends metrics under
+`my-project/artifacts/`, and atomically replaces `my-project/model.pkl`.
+
+## Run FastAPI and Streamlit
+
+Use separate terminals from the repository root:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+uvicorn api.main:app --app-dir my-project/src
+```
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+python -m streamlit run my-project/src/streamlit_app/app.py
+```
+
+Register and log in at `http://localhost:8501`. Streamlit retains the returned
+JWT in session state and sends it as `Authorization: Bearer <token>` when it
+calls `POST /api/v1/predict`.
+
+## API Contract
+
+Protected prediction request:
+
+```json
+{
+  "lot_frontage": 70.0,
+  "mas_vnr_area": 100.0,
+  "total_bsmt_sf": 856.0,
+  "garage_type": "Attchd",
+  "alley": null,
+  "exter_qual": "Gd"
+}
+```
+
+Routes:
+
+- `POST /api/v1/auth/register`
+- `POST /api/v1/auth/login`
+- `GET /api/v1/auth/me`
+- `POST /api/v1/predict`
+- `GET /health`
+
+Successful predictions are inverse-transformed with `expm1` and saved to
+`prediction_history` with the input JSON, authenticated user, price, and the
+SHA-256 fingerprint of the loaded artifact.
+
+## Retrain and Restart Simulation
+
+Record the current fingerprint from `GET http://localhost:8000/health`, then:
+
+```powershell
+python my-project/src/scripts/create_retrain_subset.py
+python my-project/src/ml/train.py --data-path my-project/data/retrain/train_subset.csv
+```
+
+Stop Uvicorn with `Ctrl+C` and start it again with the same command. A new
+`GET /health` response must report a different `model_sha256`, and predictions
+must use the new model without route or Streamlit changes. Running Uvicorn
+without `--reload` makes the manual restart behavior explicit.
+
+## Verification
 
 ```powershell
 python -m pytest -q
-python -m mypy my-project/src
 python -m ruff check .
 python -m black --check .
+python -m mypy my-project/src
 ```
-
-## Data And Artifacts
-
-The Kaggle dataset is expected to be stored locally and is not committed to Git.
-Generated model files and pipeline artifacts should stay out of Git.

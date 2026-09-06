@@ -18,6 +18,7 @@ where = ["my-project/src"]
 [tool.pytest.ini_options]
 testpaths = ["my-project/tests"]
 pythonpath = ["my-project/src"]
+cache_dir = ".pytest-tmp/cache"
 
 [tool.mypy]
 python_version = "3.11"

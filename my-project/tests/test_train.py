@@ -1,3 +1,4 @@
+import hashlib
 import logging
 from datetime import datetime
 from pathlib import Path
@@ -203,6 +204,7 @@ def test_cli_runs_with_temp_csv(
 ) -> None:
     data_path = tmp_path / "train.csv"
     artifacts_dir = tmp_path / "artifacts"
+    model_path = tmp_path / "model.pkl"
     reduced_training_data.to_csv(data_path, index=False)
 
     result = train_module.main(
@@ -211,6 +213,8 @@ def test_cli_runs_with_temp_csv(
             str(data_path),
             "--artifacts-dir",
             str(artifacts_dir),
+            "--model-path",
+            str(model_path),
             "--model",
             "ridge",
             "--alpha",
@@ -224,6 +228,89 @@ def test_cli_runs_with_temp_csv(
         ]
     )
 
-    assert Path(result["model_artifact_path"]).exists()
+    assert result["model_artifact_path"] == str(model_path)
+    assert model_path.exists()
     assert Path(result["experiments_path"]).exists()
     assert np.isfinite(result["rmse_log"])
+
+
+def test_cli_defaults_to_stable_model_path(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    stable_model_path = tmp_path / "model.pkl"
+    monkeypatch.setattr(train_module, "DEFAULT_MODEL_PATH", stable_model_path)
+
+    args = train_module.parse_args([])
+
+    assert args.model_path == stable_model_path
+
+
+def test_failed_model_dump_preserves_previous_stable_artifact(
+    reduced_training_data: pd.DataFrame,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    x_raw = reduced_training_data[train_module.FEATURE_COLUMNS]
+    y_log = np.log1p(reduced_training_data["SalePrice"])
+    pipeline = train_module.build_pipeline(model_name="ridge", alpha=1.0)
+    pipeline.fit(x_raw, y_log)
+    stable_model_path = tmp_path / "model.pkl"
+    stable_model_path.write_bytes(b"previous-valid-model")
+
+    def fail_after_partial_write(model: object, path: Path) -> None:
+        Path(path).write_bytes(b"partial-model")
+        raise OSError("disk write failed")
+
+    monkeypatch.setattr(train_module.joblib, "dump", fail_after_partial_write)
+
+    with pytest.raises(OSError, match="disk write failed"):
+        train_module.save_artifacts(
+            pipeline=pipeline,
+            metrics={"rmse_log": 0.2, "mae_log": 0.1, "r2": 0.8},
+            artifacts_dir=tmp_path / "artifacts",
+            experiments_path=tmp_path / "artifacts" / "experiments.csv",
+            model_name="ridge",
+            alpha=1.0,
+            data_path=tmp_path / "train.csv",
+            test_size=0.2,
+            random_state=42,
+            train_rows=6,
+            test_rows=2,
+            model_path=stable_model_path,
+        )
+
+    assert stable_model_path.read_bytes() == b"previous-valid-model"
+
+
+def test_retraining_overwrites_same_path_with_new_artifact(
+    reduced_training_data: pd.DataFrame,
+    tmp_path: Path,
+) -> None:
+    data_path = tmp_path / "train.csv"
+    model_path = tmp_path / "model.pkl"
+    artifacts_dir = tmp_path / "artifacts"
+    reduced_training_data.to_csv(data_path, index=False)
+
+    common_args = [
+        "--data-path",
+        str(data_path),
+        "--artifacts-dir",
+        str(artifacts_dir),
+        "--model-path",
+        str(model_path),
+        "--model",
+        "ridge",
+        "--test-size",
+        "0.25",
+        "--log-level",
+        "WARNING",
+    ]
+    first = train_module.main([*common_args, "--alpha", "1.0"])
+    first_hash = hashlib.sha256(model_path.read_bytes()).hexdigest()
+    second = train_module.main([*common_args, "--alpha", "10.0"])
+    second_hash = hashlib.sha256(model_path.read_bytes()).hexdigest()
+
+    assert first["model_artifact_path"] == str(model_path)
+    assert second["model_artifact_path"] == str(model_path)
+    assert first_hash != second_hash
