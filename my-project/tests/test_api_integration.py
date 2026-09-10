@@ -20,12 +20,21 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 VALID_PREDICTION = {
-    "lot_frontage": 70.0,
-    "mas_vnr_area": 100.0,
+    "overall_qual": 7,
+    "gr_liv_area": 1710.0,
+    "garage_cars": 2.0,
+    "garage_area": 548.0,
     "total_bsmt_sf": 856.0,
+    "first_flr_sf": 856.0,
+    "full_bath": 2,
+    "tot_rms_abv_grd": 8,
+    "year_built": 2003,
+    "year_remod_add": 2003,
+    "neighborhood": "CollgCr",
     "garage_type": "Attchd",
-    "alley": None,
     "exter_qual": "Gd",
+    "kitchen_qual": "Gd",
+    "bsmt_qual": "Gd",
 }
 
 
@@ -37,12 +46,21 @@ class InspectingModel:
 
     def predict(self, frame: pd.DataFrame) -> np.ndarray:
         assert list(frame.columns) == [
-            "LotFrontage",
-            "MasVnrArea",
+            "OverallQual",
+            "GrLivArea",
+            "GarageCars",
+            "GarageArea",
             "TotalBsmtSF",
+            "1stFlrSF",
+            "FullBath",
+            "TotRmsAbvGrd",
+            "YearBuilt",
+            "YearRemodAdd",
+            "Neighborhood",
             "GarageType",
-            "Alley",
             "ExterQual",
+            "KitchenQual",
+            "BsmtQual",
         ]
         return np.array([np.log1p(self.price)])
 
@@ -166,7 +184,7 @@ def test_prediction_history_returns_only_current_users_latest_records(
         first = client.post("/api/v1/predict", json=VALID_PREDICTION, headers=headers)
         second = client.post(
             "/api/v1/predict",
-            json={**VALID_PREDICTION, "lot_frontage": 88.0},
+            json={**VALID_PREDICTION, "overall_qual": 8},
             headers=headers,
         )
         assert first.status_code == 201
@@ -198,7 +216,7 @@ def test_prediction_history_returns_only_current_users_latest_records(
     assert len(response.json()) == 1
     latest = response.json()[0]
     assert latest["id"] == second.json()["prediction_history_id"]
-    assert latest["input_payload"]["lot_frontage"] == 88.0
+    assert latest["input_payload"]["overall_qual"] == 8
     assert latest["predicted_price"] == 208_500.0
     assert latest["model_sha256"] == second.json()["model_sha256"]
     assert isinstance(latest["created_at"], str)
@@ -374,7 +392,7 @@ def test_invalid_prediction_payload_is_rejected(tmp_path: Path) -> None:
         token = _register_and_login(client)
         response = client.post(
             "/api/v1/predict",
-            json={**VALID_PREDICTION, "lot_frontage": -1},
+            json={**VALID_PREDICTION, "overall_qual": -1},
             headers={"Authorization": f"Bearer {token}"},
         )
 

@@ -62,14 +62,14 @@ def test_history_rows_are_flat_and_readable() -> None:
     records = [
         {
             "id": 7,
-            "input_payload": {
-                "lot_frontage": 88.0,
-                "mas_vnr_area": 99.0,
+                "input_payload": {
+                "overall_qual": 8,
+                "gr_liv_area": 1750.0,
                 "total_bsmt_sf": 1494.0,
+                "neighborhood": "CollgCr",
                 "garage_type": "Attchd",
-                "alley": None,
                 "exter_qual": "Gd",
-            },
+                },
             "predicted_price": 229_452.05,
             "model_sha256": "a" * 64,
             "created_at": "2026-09-03T10:00:00",

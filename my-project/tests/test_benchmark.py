@@ -12,12 +12,21 @@ from streamlit_app.benchmark import (
 )
 
 VALID_PAYLOAD = {
-    "lot_frontage": 88.0,
-    "mas_vnr_area": 99.0,
+    "overall_qual": 8,
+    "gr_liv_area": 1750.0,
+    "garage_cars": 2.0,
+    "garage_area": 550.0,
     "total_bsmt_sf": 1494.0,
+    "first_flr_sf": 1494.0,
+    "full_bath": 2,
+    "tot_rms_abv_grd": 7,
+    "year_built": 2005,
+    "year_remod_add": 2006,
+    "neighborhood": "CollgCr",
     "garage_type": "Attchd",
-    "alley": None,
     "exter_qual": "Gd",
+    "kitchen_qual": "Gd",
+    "bsmt_qual": "Gd",
 }
 MODEL_SHA256 = "a" * 64
 
