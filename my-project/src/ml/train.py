@@ -91,7 +91,8 @@ def build_model(
     valid_values = ", ".join(MODEL_CHOICES)
     raise ValueError(f"Unknown model '{model_name}'. Expected one of: {valid_values}.")
 
-#Pipeline for preprocessing and regression
+
+# Pipeline for preprocessing and regression
 def build_pipeline(
     model_name: str = DEFAULT_MODEL,
     alpha: float = DEFAULT_ALPHA,
@@ -113,7 +114,8 @@ def build_pipeline(
         ]
     )
 
-#Train model on training data
+
+# Train model on training data
 def train(
     pipeline: Pipeline,
     x_train: pd.DataFrame,
@@ -123,6 +125,7 @@ def train(
     pipeline.fit(x_train, y_train)
     LOGGER.info("Training completed on %s rows", len(x_train))
     return pipeline
+
 
 # Evaluate the trained model on the holdout set
 def evaluate(
@@ -164,7 +167,7 @@ def _unique_path(path: Path) -> Path:
         counter += 1
 
 
-def _atomic_dump(pipeline: Pipeline, model_path: Path) -> None:
+def atomic_dump(pipeline: Pipeline, model_path: Path) -> None:
     """Replace a model artifact only after serialization succeeds."""
 
     model_path.parent.mkdir(parents=True, exist_ok=True)
@@ -213,7 +216,7 @@ def save_artifacts(
         model_path = Path(model_path)
         model_path.parent.mkdir(parents=True, exist_ok=True)
 
-    _atomic_dump(pipeline, model_path)
+    atomic_dump(pipeline, model_path)
 
     row = {
         "timestamp": run_timestamp.isoformat(timespec="seconds"),
@@ -263,7 +266,8 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     )
     return args
 
-#Split the data into training and holdout set
+
+# Split the data into training and holdout set
 def main(argv: Sequence[str] | None = None) -> dict[str, float | str]:
     """Run the full training experiment from the command line."""
     args = parse_args(argv)
@@ -296,7 +300,7 @@ def main(argv: Sequence[str] | None = None) -> dict[str, float | str]:
         if args.experiments_path is not None
         else artifacts_dir / "experiments.csv"
     )
-#Save the train model and append one experiment row
+    # Save the train model and append one experiment row
     model_path, saved_experiments_path = save_artifacts(
         pipeline=fitted_pipeline,
         metrics=metrics,
