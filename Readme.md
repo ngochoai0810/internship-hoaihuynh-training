@@ -80,12 +80,21 @@ Protected prediction request:
 
 ```json
 {
-  "lot_frontage": 70.0,
-  "mas_vnr_area": 100.0,
+  "overall_qual": 7,
+  "gr_liv_area": 1710.0,
+  "garage_cars": 2.0,
+  "garage_area": 548.0,
   "total_bsmt_sf": 856.0,
+  "first_flr_sf": 856.0,
+  "full_bath": 2,
+  "tot_rms_abv_grd": 8,
+  "year_built": 2003,
+  "year_remod_add": 2003,
+  "neighborhood": "CollgCr",
   "garage_type": "Attchd",
-  "alley": null,
-  "exter_qual": "Gd"
+  "exter_qual": "Gd",
+  "kitchen_qual": "Gd",
+  "bsmt_qual": "Gd"
 }
 ```
 
@@ -109,6 +118,14 @@ Record the current fingerprint from `GET http://localhost:8000/health`, then:
 ```powershell
 python my-project/src/scripts/create_retrain_subset.py
 python my-project/src/ml/train.py --data-path my-project/data/retrain/train_subset.csv
+```
+
+The reportable artifact is produced instead by the packaging step, which refits
+the selected model on train+eval, saves one pipeline file, and scores the final
+holdout exactly once:
+
+```powershell
+python -m ml.finalize
 ```
 
 Stop Uvicorn with `Ctrl+C` and start it again with the same command. A new
