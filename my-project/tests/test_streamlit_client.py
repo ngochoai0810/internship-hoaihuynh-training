@@ -71,7 +71,7 @@ def test_predict_sends_bearer_token_and_payload() -> None:
         )
     )
     client = ApiClient("http://localhost:8000/", timeout=5, transport=transport)
-    payload = {"lot_frontage": 70.0, "exter_qual": "Gd"}
+    payload = {"overall_qual": 7, "gr_liv_area": 1710.0, "exter_qual": "Gd"}
 
     result = client.predict(payload, token="jwt-token")
 
@@ -132,7 +132,7 @@ def test_prediction_history_uses_bearer_token_and_limit() -> None:
     history = [
         {
             "id": 7,
-            "input_payload": {"lot_frontage": 88.0},
+            "input_payload": {"overall_qual": 8, "gr_liv_area": 1750.0},
             "predicted_price": 229_452.05,
             "model_sha256": "a" * 64,
             "created_at": "2026-09-03T10:00:00",

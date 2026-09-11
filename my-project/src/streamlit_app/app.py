@@ -12,10 +12,14 @@ from dotenv import load_dotenv
 from streamlit_app.benchmark import BenchmarkConfig, BenchmarkResult, run_benchmark
 from streamlit_app.client import ApiClient, ApiResult
 from streamlit_app.demo import (
+    BASEMENT_QUALITY_OPTIONS,
+    BENCHMARK_PAYLOAD,
     DEMO_TOTAL_REQUESTS,
-    HOLDOUT_ACTUAL_PRICE,
-    HOLDOUT_PAYLOAD,
-    HOLDOUT_SAMPLE_ID,
+    GARAGE_TYPE_OPTIONS,
+    HOLDOUT_SAMPLE,
+    MANUAL_DEFAULT_PAYLOAD,
+    NEIGHBORHOOD_OPTIONS,
+    QUALITY_OPTIONS,
     compare_prediction,
     format_history_rows,
     get_verified_evaluation,
@@ -108,69 +112,127 @@ def _prediction_payload(use_holdout: bool) -> dict[str, Any] | None:
     """Render the prediction form and return values only after submission."""
 
     defaults: dict[str, Any] = (
-        HOLDOUT_PAYLOAD
-        if use_holdout
-        else {
-            "lot_frontage": 70.0,
-            "mas_vnr_area": 100.0,
-            "total_bsmt_sf": 856.0,
-            "garage_type": "Attchd",
-            "alley": None,
-            "exter_qual": "TA",
-        }
+        HOLDOUT_SAMPLE.payload
+        if use_holdout and HOLDOUT_SAMPLE is not None
+        else MANUAL_DEFAULT_PAYLOAD
     )
+
+    def _option_index(options: list[str], key: str) -> int:
+        value = defaults.get(key)
+        return options.index(str(value)) if str(value) in options else 0
+
     with st.form("prediction"):
-        left, right = st.columns(2)
-        with left:
-            lot_frontage = st.number_input(
-                "Chiều rộng mặt tiền (feet)",
-                min_value=0.0,
-                value=float(defaults["lot_frontage"]),
-                disabled=use_holdout,
-            )
-            mas_vnr_area = st.number_input(
-                "Diện tích ốp tường (sq ft)",
-                min_value=0.0,
-                value=float(defaults["mas_vnr_area"]),
-                disabled=use_holdout,
-            )
-            total_bsmt_sf = st.number_input(
-                "Tổng diện tích tầng hầm (sq ft)",
-                min_value=0.0,
-                value=float(defaults["total_bsmt_sf"]),
-                disabled=use_holdout,
-            )
-        with right:
-            garage_options = [
-                "Attchd",
-                "Detchd",
-                "BuiltIn",
-                "Basment",
-                "CarPort",
-                "2Types",
-                "None",
-            ]
-            garage_type = st.selectbox(
-                "Loại garage",
-                garage_options,
-                index=garage_options.index(str(defaults["garage_type"])),
-                disabled=use_holdout,
-            )
-            alley_options = ["None", "Grvl", "Pave"]
-            default_alley = defaults["alley"] or "None"
-            alley = st.selectbox(
-                "Lối hẻm",
-                alley_options,
-                index=alley_options.index(str(default_alley)),
-                disabled=use_holdout,
-            )
-            quality_options = ["Po", "Fa", "TA", "Gd", "Ex"]
-            exter_qual = st.selectbox(
-                "Chất lượng bên ngoài",
-                quality_options,
-                index=quality_options.index(str(defaults["exter_qual"])),
-                disabled=use_holdout,
-            )
+        with st.expander("Diện tích và phòng", expanded=True):
+            left, right = st.columns(2)
+            with left:
+                gr_liv_area = st.number_input(
+                    "Diện tích ở trên mặt đất (sq ft)",
+                    min_value=0.0,
+                    value=float(defaults["gr_liv_area"]),
+                    disabled=use_holdout,
+                )
+                first_flr_sf = st.number_input(
+                    "Diện tích tầng một (sq ft)",
+                    min_value=0.0,
+                    value=float(defaults["first_flr_sf"]),
+                    disabled=use_holdout,
+                )
+                total_bsmt_sf = st.number_input(
+                    "Tổng diện tích tầng hầm (sq ft)",
+                    min_value=0.0,
+                    value=float(defaults["total_bsmt_sf"]),
+                    disabled=use_holdout,
+                )
+            with right:
+                full_bath = st.number_input(
+                    "Số phòng tắm đầy đủ",
+                    min_value=0,
+                    step=1,
+                    value=int(defaults["full_bath"]),
+                    disabled=use_holdout,
+                )
+                tot_rms_abv_grd = st.number_input(
+                    "Số phòng trên mặt đất",
+                    min_value=0,
+                    step=1,
+                    value=int(defaults["tot_rms_abv_grd"]),
+                    disabled=use_holdout,
+                )
+
+        with st.expander("Năm và chất lượng", expanded=True):
+            left, right = st.columns(2)
+            with left:
+                year_built = st.number_input(
+                    "Năm xây dựng",
+                    min_value=0,
+                    step=1,
+                    value=int(defaults["year_built"]),
+                    disabled=use_holdout,
+                )
+                year_remod_add = st.number_input(
+                    "Năm cải tạo",
+                    min_value=0,
+                    step=1,
+                    value=int(defaults["year_remod_add"]),
+                    disabled=use_holdout,
+                )
+                overall_qual = st.number_input(
+                    "Chất lượng tổng thể (1-10)",
+                    min_value=0,
+                    max_value=10,
+                    step=1,
+                    value=int(defaults["overall_qual"]),
+                    disabled=use_holdout,
+                )
+            with right:
+                exter_qual = st.selectbox(
+                    "Chất lượng bên ngoài",
+                    QUALITY_OPTIONS,
+                    index=_option_index(QUALITY_OPTIONS, "exter_qual"),
+                    disabled=use_holdout,
+                )
+                kitchen_qual = st.selectbox(
+                    "Chất lượng nhà bếp",
+                    QUALITY_OPTIONS,
+                    index=_option_index(QUALITY_OPTIONS, "kitchen_qual"),
+                    disabled=use_holdout,
+                )
+                bsmt_qual = st.selectbox(
+                    "Chất lượng tầng hầm",
+                    BASEMENT_QUALITY_OPTIONS,
+                    index=_option_index(BASEMENT_QUALITY_OPTIONS, "bsmt_qual"),
+                    disabled=use_holdout,
+                )
+
+        with st.expander("Garage và khu vực", expanded=True):
+            left, right = st.columns(2)
+            with left:
+                garage_cars = st.number_input(
+                    "Số chỗ đậu xe",
+                    min_value=0.0,
+                    value=float(defaults["garage_cars"]),
+                    disabled=use_holdout,
+                )
+                garage_area = st.number_input(
+                    "Diện tích garage (sq ft)",
+                    min_value=0.0,
+                    value=float(defaults["garage_area"]),
+                    disabled=use_holdout,
+                )
+            with right:
+                garage_type = st.selectbox(
+                    "Loại garage",
+                    GARAGE_TYPE_OPTIONS,
+                    index=_option_index(GARAGE_TYPE_OPTIONS, "garage_type"),
+                    disabled=use_holdout,
+                )
+                neighborhood = st.selectbox(
+                    "Khu vực",
+                    NEIGHBORHOOD_OPTIONS,
+                    index=_option_index(NEIGHBORHOOD_OPTIONS, "neighborhood"),
+                    disabled=use_holdout,
+                )
+
         submitted = st.form_submit_button(
             "Dự đoán giá", type="primary", use_container_width=True
         )
@@ -178,12 +240,21 @@ def _prediction_payload(use_holdout: bool) -> dict[str, Any] | None:
     if not submitted:
         return None
     return {
-        "lot_frontage": lot_frontage,
-        "mas_vnr_area": mas_vnr_area,
-        "total_bsmt_sf": total_bsmt_sf,
-        "garage_type": garage_type,
-        "alley": None if alley == "None" else alley,
+        "overall_qual": int(overall_qual),
+        "gr_liv_area": float(gr_liv_area),
+        "garage_cars": float(garage_cars),
+        "garage_area": float(garage_area),
+        "total_bsmt_sf": float(total_bsmt_sf),
+        "first_flr_sf": float(first_flr_sf),
+        "full_bath": int(full_bath),
+        "tot_rms_abv_grd": int(tot_rms_abv_grd),
+        "year_built": int(year_built),
+        "year_remod_add": int(year_remod_add),
+        "neighborhood": neighborhood,
+        "garage_type": None if garage_type == "None" else garage_type,
         "exter_qual": exter_qual,
+        "kitchen_qual": kitchen_qual,
+        "bsmt_qual": bsmt_qual,
     }
 
 
@@ -195,24 +266,33 @@ def render_prediction(health: ApiResult) -> None:
     if health.ok and health.data is not None:
         health_hash = str(health.data.get("model_sha256", ""))
     verified_evaluation = get_verified_evaluation(health_hash)
-    sample_label = (
-        f"Mẫu holdout — Id {HOLDOUT_SAMPLE_ID}"
-        if verified_evaluation is not None
-        else f"Mẫu tham chiếu — Id {HOLDOUT_SAMPLE_ID}"
-    )
-    sample_mode = st.radio(
-        "Nguồn dữ liệu",
-        [sample_label, "Nhập thủ công"],
-        horizontal=True,
-    )
-    use_reference_sample = not sample_mode.startswith("Nhập thủ công")
-    if use_reference_sample and verified_evaluation is None:
-        st.warning(
-            "Model hiện tại không khớp artifact đã xác minh. Id 605 chỉ được dùng "
-            f"làm mẫu tham chiếu có SalePrice ${HOLDOUT_ACTUAL_PRICE:,.0f}, không "
-            "được gọi là holdout của model này."
+
+    use_reference_sample = False
+    if HOLDOUT_SAMPLE is None:
+        st.info(
+            "Chưa có mẫu holdout. Chạy `python -m ml.finalize` để sinh "
+            "`artifacts/final/demo_samples.json` rồi mở lại trang này."
         )
-# Lấy token từ session
+    else:
+        sample_label = (
+            f"Mẫu holdout — Id {HOLDOUT_SAMPLE.sample_id}"
+            if verified_evaluation is not None
+            else f"Mẫu tham chiếu — Id {HOLDOUT_SAMPLE.sample_id}"
+        )
+        sample_mode = st.radio(
+            "Nguồn dữ liệu",
+            [sample_label, "Nhập thủ công"],
+            horizontal=True,
+        )
+        use_reference_sample = not sample_mode.startswith("Nhập thủ công")
+        if use_reference_sample and verified_evaluation is None:
+            st.warning(
+                "Model hiện tại không khớp artifact đã xác minh. "
+                f"Id {HOLDOUT_SAMPLE.sample_id} chỉ được dùng làm mẫu tham chiếu "
+                f"có SalePrice ${HOLDOUT_SAMPLE.actual_price:,.0f}, không được "
+                "gọi là holdout của model này."
+            )
+    # Lấy token từ session
     payload = _prediction_payload(use_reference_sample)
     if payload is None:
         return
@@ -224,13 +304,13 @@ def render_prediction(health: ApiResult) -> None:
 
     predicted_price = float(result.data["predicted_price"])
     model_hash = str(result.data["model_sha256"])
-    if use_reference_sample:
+    if use_reference_sample and HOLDOUT_SAMPLE is not None:
         comparison = compare_prediction(
             predicted_price=predicted_price,
-            actual_price=HOLDOUT_ACTUAL_PRICE,
+            actual_price=HOLDOUT_SAMPLE.actual_price,
         )
         actual_column, predicted_column, difference_column, error_column = st.columns(4)
-        actual_column.metric("Giá thật", f"${HOLDOUT_ACTUAL_PRICE:,.0f}")
+        actual_column.metric("Giá thật", f"${HOLDOUT_SAMPLE.actual_price:,.0f}")
         predicted_column.metric("Giá dự đoán", f"${predicted_price:,.2f}")
         difference_column.metric(
             "Chênh lệch tuyệt đối", f"${comparison.absolute_error:,.2f}"
@@ -338,7 +418,7 @@ def render_load_test(health: ApiResult) -> None:
                 run_benchmark(
                     api_url=API_URL,
                     token=str(st.session_state["token"]),
-                    payload=dict(HOLDOUT_PAYLOAD),
+                    payload=dict(BENCHMARK_PAYLOAD),
                     expected_model_sha256=str(health.data["model_sha256"]),
                     config=BenchmarkConfig(
                         total_requests=DEMO_TOTAL_REQUESTS,
