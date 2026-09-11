@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from datetime import datetime
 from pathlib import Path
-from typing import TypeAlias, cast
+from typing import cast
 
 import numpy as np
 import pandas as pd
@@ -55,9 +55,9 @@ FEATURE_COLUMNS: list[str] = (
 ORDINAL_QUALITY_ORDER: list[str] = ["Po", "Fa", "TA", "Gd", "Ex"]
 MODEL_NAMES: tuple[str, str] = ("linear_regression", "ridge")
 
-BaselineModel: TypeAlias = LinearRegression | Ridge
-BaselinePipeline: TypeAlias = Pipeline
-SplitRawData: TypeAlias = tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]
+type BaselineModel = LinearRegression | Ridge
+type BaselinePipeline = Pipeline
+type SplitRawData = tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]
 
 
 def _validate_required_columns(df: pd.DataFrame) -> None:

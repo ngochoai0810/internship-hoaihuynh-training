@@ -307,9 +307,11 @@ def build_preprocessing_pipeline(
         steps=[("onehot", OneHotEncoder(handle_unknown="ignore", sparse_output=False))]
     )
     ordinal_categories = [
-        BASEMENT_QUALITY_ORDER.copy()
-        if col == "BsmtQual"
-        else ORDINAL_QUALITY_ORDER.copy()
+        (
+            BASEMENT_QUALITY_ORDER.copy()
+            if col == "BsmtQual"
+            else ORDINAL_QUALITY_ORDER.copy()
+        )
         for col in ordinal_features
     ]
     ordinal_transformer = Pipeline(

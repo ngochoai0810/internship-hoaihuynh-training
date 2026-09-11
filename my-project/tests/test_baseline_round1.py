@@ -83,9 +83,7 @@ def test_train_baseline_models_trains_linear_regression_and_ridge(
         x, y, test_size=0.25, random_state=42
     )
 
-    models = baseline_round1.train_baseline_models(
-        x_train, y_train, ridge_alpha=2.5
-    )
+    models = baseline_round1.train_baseline_models(x_train, y_train, ridge_alpha=2.5)
 
     assert set(models) == {"linear_regression", "ridge"}
     assert isinstance(models["linear_regression"], LinearRegression)

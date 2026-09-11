@@ -16,7 +16,7 @@ nbformat==5.10.4
 numpy==2.4.3
 pandas==3.0.1
 pydantic-settings==2.14.2
-pwdlib==0.3.0
+pwdlib[bcrypt]==0.3.0
 PyJWT==2.13.0
 pytest==8.4.2
 python-dotenv==1.2.2

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
-from typing import TypeAlias, cast
+from typing import cast
 
 import joblib
 import numpy as np
@@ -25,8 +25,8 @@ DEFAULT_TEST_SIZE = 0.2
 DEFAULT_RANDOM_STATE = 42
 DEFAULT_RIDGE_ALPHA = 1.0
 
-BaselineModel: TypeAlias = LinearRegression | Ridge
-SplitData: TypeAlias = tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]
+type BaselineModel = LinearRegression | Ridge
+type SplitData = tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]
 
 
 def load_processed_training_data(path: Path) -> tuple[pd.DataFrame, pd.Series]:
