@@ -18,7 +18,8 @@ where = ["my-project/src"]
 [tool.pytest.ini_options]
 testpaths = ["my-project/tests"]
 pythonpath = ["my-project/src"]
-cache_dir = ".pytest-tmp/cache"
+cache_dir = "my-project/.pytest-cache"
+addopts = "--basetemp=my-project/.pytest-basetemp"
 
 [tool.mypy]
 python_version = "3.12"
@@ -37,6 +38,10 @@ extend-exclude = '''
   \.git
   | \.mypy_cache
   | \.pytest_cache
+  | \.pytest-tmp
+  | my-project/\.pytest-basetemp
+  | my-project/\.pytest-cache
+  | my-project/\.pytest-cache-audit
   | \.venv
   | \.venv-1
   | my-project/notebooks
@@ -50,6 +55,10 @@ exclude = [
   ".git",
   ".mypy_cache",
   ".pytest_cache",
+  ".pytest-tmp",
+  "my-project/.pytest-basetemp",
+  "my-project/.pytest-cache",
+  "my-project/.pytest-cache-audit",
   ".venv",
   ".venv-1",
   "my-project/notebooks",

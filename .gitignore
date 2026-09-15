@@ -4,6 +4,9 @@ __pycache__/
 **/__pycache__/
 .pytest_cache/
 .pytest-tmp/
+my-project/.pytest-cache/
+my-project/.pytest-basetemp/
+my-project/.pytest-cache-audit/
 *.pyc
 venv/
 .venv/
@@ -23,5 +26,6 @@ my-project/models/
 my-project/model.pkl
 my-project/model_metadata.json
 my-project/.env
+my-project/src/*.egg-info/
 *.csv
 *.zip
