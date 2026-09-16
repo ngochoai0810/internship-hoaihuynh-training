@@ -34,18 +34,24 @@ warn_return_any = true
 line-length = 88
 target-version = ["py312"]
 extend-exclude = '''
-/(
-  \.git
+(^|/)(
+    \.agents
+  | \.black-cache
+  | \.codex
+  | \.git
   | \.mypy_cache
   | \.pytest_cache
   | \.pytest-tmp
+  | \.venv
+  | \.venv-1
+  | \.ruff_cache
+  | \.superpowers
+  | \.worktrees
   | my-project/\.pytest-basetemp
   | my-project/\.pytest-cache
   | my-project/\.pytest-cache-audit
-  | \.venv
-  | \.venv-1
   | my-project/notebooks
-)/
+)(/|$)
 '''
 
 [tool.ruff]
@@ -53,6 +59,9 @@ line-length = 88
 target-version = "py312"
 exclude = [
   ".git",
+  ".agents",
+  ".black-cache",
+  ".codex",
   ".mypy_cache",
   ".pytest_cache",
   ".pytest-tmp",
@@ -61,6 +70,9 @@ exclude = [
   "my-project/.pytest-cache-audit",
   ".venv",
   ".venv-1",
+  ".ruff_cache",
+  ".superpowers",
+  ".worktrees",
   "my-project/notebooks",
 ]
 

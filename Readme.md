@@ -196,12 +196,15 @@ Use the project virtual environment:
 ```powershell
 .\.venv\Scripts\python.exe -m pytest -q
 .\.venv\Scripts\python.exe -m ruff check .
+$env:BLACK_CACHE_DIR = (Resolve-Path 'my-project').Path + '\.black-cache'
 .\.venv\Scripts\python.exe -m black --check .
 .\.venv\Scripts\python.exe -m mypy my-project/src
 ```
 
 Pytest uses project-local cache and basetemp directories from `pyproject.toml`,
 which avoids Windows temp-directory permission issues.
+Black uses `BLACK_CACHE_DIR` in the project to avoid user-cache permission
+issues on Windows/OneDrive.
 
 ## Known Generated Files
 
@@ -213,6 +216,7 @@ These are expected local outputs and should remain untracked:
 - `my-project/model.pkl`
 - `my-project/.pytest-cache/`
 - `my-project/.pytest-basetemp/`
+- `my-project/.black-cache/`
 - `my-project/src/*.egg-info/`
 
 ## Final Demo Checklist

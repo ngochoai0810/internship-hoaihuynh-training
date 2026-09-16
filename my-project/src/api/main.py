@@ -1,7 +1,7 @@
 """FastAPI application factory with model-loading lifespan."""
 
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from time import perf_counter
 from uuid import uuid4
@@ -55,7 +55,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     application.include_router(prediction.router, prefix=app_settings.api_v1_prefix)
 
     @application.middleware("http")
-    async def log_requests(request: Request, call_next) -> Response:  # type: ignore[no-untyped-def]
+    async def log_requests(
+        request: Request,
+        call_next: Callable[[Request], Awaitable[Response]],
+    ) -> Response:
         request_id = request.headers.get("X-Request-ID", str(uuid4()))
         started_at = perf_counter()
         try:

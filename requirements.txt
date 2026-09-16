@@ -27,5 +27,5 @@ scikit-learn==1.8.0
 scipy==1.17.1
 SQLAlchemy==2.0.51
 streamlit==1.61.1
-types-requests==2.33.0.20260516
+types-requests==2.33.0.20260906
 uvicorn==0.49.0

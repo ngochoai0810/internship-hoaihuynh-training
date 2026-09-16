@@ -14,6 +14,7 @@ venv/
 *.pyd
 .mypy_cache/
 .ruff_cache/
+.black-cache/
 .idea/
 .env
 .agents/

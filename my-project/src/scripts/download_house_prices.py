@@ -6,7 +6,7 @@ import argparse
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol
+from typing import Protocol, cast
 from zipfile import ZipFile
 
 PROJECT_DIR = Path(__file__).resolve().parents[2]
@@ -35,7 +35,7 @@ class DownloadResult:
 def _default_api() -> KaggleApiLike:
     from kaggle.api.kaggle_api_extended import KaggleApi
 
-    return KaggleApi()
+    return cast(KaggleApiLike, KaggleApi())
 
 
 def _extract_required_csvs(archive_path: Path, destination: Path) -> DownloadResult:
