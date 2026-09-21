@@ -66,8 +66,8 @@ Download the Kaggle House Prices competition data into `my-project/data/raw`:
 python my-project/src/scripts/download_house_prices.py --destination my-project/data/raw
 ```
 
-This command uses `KAGGLE_USERNAME` and `KAGGLE_KEY` from the environment or
-the standard Kaggle credential file.
+This command uses `KAGGLE_API_TOKEN` from the environment or the standard
+Kaggle token file (`~/.kaggle/access_token`).
 
 Train a simple stable model:
 
@@ -175,8 +175,7 @@ spin-down.
 Required Render secrets for the API service:
 
 - `SECRET_KEY`: at least 32 characters.
-- `KAGGLE_USERNAME`: Kaggle account username.
-- `KAGGLE_KEY`: Kaggle API token.
+- `KAGGLE_API_TOKEN`: Kaggle API token (the current `KGAT_...` format).
 
 Operational commands used by the Blueprint:
 
