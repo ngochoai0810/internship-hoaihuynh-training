@@ -2,13 +2,10 @@ services:
   - type: web
     name: house-price-api
     runtime: python
-    plan: starter
+    plan: free
     buildCommand: bash my-project/scripts/render_build.sh
     startCommand: bash my-project/scripts/render_start_api.sh
-    disk:
-      name: house-price-api-data
-      mountPath: /var/data
-      sizeGB: 1
+    healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION
         value: 3.13.11
@@ -18,17 +15,19 @@ services:
         sync: false
       - key: KAGGLE_KEY
         sync: false
+      - key: RENDER_DISK_MOUNT
+        value: /tmp
       - key: DATABASE_URL
-        value: sqlite:////var/data/app.db
+        value: sqlite:////tmp/app.db
       - key: MODEL_PATH
-        value: /var/data/model.pkl
+        value: my-project/model.pkl
       - key: LOG_LEVEL
         value: INFO
 
   - type: web
     name: house-price-ui
     runtime: python
-    plan: starter
+    plan: free
     buildCommand: python -m pip install --upgrade pip && python -m pip install -r requirements.txt && python -m pip install -e .
     startCommand: bash my-project/scripts/render_start_streamlit.sh
     envVars:

@@ -163,9 +163,14 @@ you want to correlate a demo request with server logs.
 
 The repo includes `render.yaml` for two Render web services:
 
-- `house-price-api`: FastAPI, SQLite on a persistent disk, model artifact copied
-  to the disk on first runtime start.
+- `house-price-api`: FastAPI with an ephemeral SQLite database and the model
+  artifact packaged during the build.
 - `house-price-ui`: Streamlit frontend configured to call the API service.
+
+Both services use Render's free compute plan for the internship demo. Free
+instances spin down when idle, and their local files are ephemeral. Users and
+prediction history are therefore reset after an API restart, redeploy, or
+spin-down.
 
 Required Render secrets for the API service:
 
@@ -187,7 +192,11 @@ Render notes:
 - Services bind to `0.0.0.0:$PORT`.
 - The API build downloads Kaggle data and packages `model.pkl`.
 - Runtime startup runs Alembic migrations and then launches Uvicorn.
-- The persistent disk is used at runtime for `app.db` and `model.pkl`.
+- The API health check uses `/health`.
+- SQLite is stored at `/tmp/app.db`; it is intentionally non-persistent on the
+  free plan.
+- Open the API and UI several minutes before a live demo so both free services
+  have time to wake up.
 
 ## Verification
 
