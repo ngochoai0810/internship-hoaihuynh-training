@@ -4,14 +4,39 @@ from typing import Annotated
 
 from database import get_db
 from dependencies.auth import get_current_user
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from ml.runtime import predict_price
 from models import PredictionHistory, User
-from schemas.prediction import PredictionInput, PredictionResponse
+from schemas.prediction import (
+    PredictionHistoryResponse,
+    PredictionInput,
+    PredictionResponse,
+)
+from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 router = APIRouter(tags=["prediction"])
+
+
+@router.get(
+    "/predictions/history",
+    response_model=list[PredictionHistoryResponse],
+)
+def read_prediction_history(
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+) -> list[PredictionHistory]:
+    """Return the authenticated user's latest prediction records."""
+
+    records = db.scalars(
+        select(PredictionHistory)
+        .where(PredictionHistory.user_id == current_user.id)
+        .order_by(PredictionHistory.id.desc())
+        .limit(limit)
+    )
+    return list(records)
 
 
 @router.post(

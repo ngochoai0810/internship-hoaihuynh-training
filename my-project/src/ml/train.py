@@ -22,6 +22,11 @@ if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from ml.preprocessing import (  # noqa: E402
+    FEATURE_COLUMNS,
+    NOMINAL_FEATURES,
+    NUMERIC_FEATURES,
+    ORDINAL_FEATURES,
+    TARGET_COLUMN,
     HousePricesMissingValueImputer,
     build_preprocessing_pipeline,
 )
@@ -32,12 +37,6 @@ PROJECT_DIR = Path(__file__).resolve().parents[2]
 DEFAULT_DATA_PATH = PROJECT_DIR / "data" / "raw" / "train.csv"
 DEFAULT_ARTIFACTS_DIR = PROJECT_DIR / "artifacts"
 DEFAULT_MODEL_PATH = PROJECT_DIR / "model.pkl"
-
-TARGET_COLUMN = "SalePrice"
-NUMERIC_FEATURES = ["LotFrontage", "MasVnrArea", "TotalBsmtSF"]
-CATEGORICAL_FEATURES = ["GarageType", "Alley"]
-ORDINAL_FEATURES = ["ExterQual"]
-FEATURE_COLUMNS = NUMERIC_FEATURES + CATEGORICAL_FEATURES + ORDINAL_FEATURES
 
 MODEL_CHOICES = ("linear", "ridge", "lasso")
 DEFAULT_MODEL = "ridge"
@@ -93,6 +92,7 @@ def build_model(
     raise ValueError(f"Unknown model '{model_name}'. Expected one of: {valid_values}.")
 
 
+# Pipeline for preprocessing and regression
 def build_pipeline(
     model_name: str = DEFAULT_MODEL,
     alpha: float = DEFAULT_ALPHA,
@@ -101,7 +101,7 @@ def build_pipeline(
     """Build a train-only preprocessing and regression pipeline."""
     preprocessor = build_preprocessing_pipeline(
         numeric_features=NUMERIC_FEATURES,
-        categorical_features=CATEGORICAL_FEATURES,
+        categorical_features=NOMINAL_FEATURES,
         ordinal_features=ORDINAL_FEATURES,
     )
     model = build_model(model_name=model_name, alpha=alpha, warn_alpha=warn_alpha)
@@ -115,6 +115,7 @@ def build_pipeline(
     )
 
 
+# Train model on training data
 def train(
     pipeline: Pipeline,
     x_train: pd.DataFrame,
@@ -126,6 +127,7 @@ def train(
     return pipeline
 
 
+# Evaluate the trained model on the holdout set
 def evaluate(
     pipeline: Pipeline,
     x_test: pd.DataFrame,
@@ -165,7 +167,7 @@ def _unique_path(path: Path) -> Path:
         counter += 1
 
 
-def _atomic_dump(pipeline: Pipeline, model_path: Path) -> None:
+def atomic_dump(pipeline: Pipeline, model_path: Path) -> None:
     """Replace a model artifact only after serialization succeeds."""
 
     model_path.parent.mkdir(parents=True, exist_ok=True)
@@ -214,7 +216,7 @@ def save_artifacts(
         model_path = Path(model_path)
         model_path.parent.mkdir(parents=True, exist_ok=True)
 
-    _atomic_dump(pipeline, model_path)
+    atomic_dump(pipeline, model_path)
 
     row = {
         "timestamp": run_timestamp.isoformat(timespec="seconds"),
@@ -265,6 +267,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     return args
 
 
+# Split the data into training and holdout set
 def main(argv: Sequence[str] | None = None) -> dict[str, float | str]:
     """Run the full training experiment from the command line."""
     args = parse_args(argv)
@@ -297,6 +300,7 @@ def main(argv: Sequence[str] | None = None) -> dict[str, float | str]:
         if args.experiments_path is not None
         else artifacts_dir / "experiments.csv"
     )
+    # Save the train model and append one experiment row
     model_path, saved_experiments_path = save_artifacts(
         pipeline=fitted_pipeline,
         metrics=metrics,

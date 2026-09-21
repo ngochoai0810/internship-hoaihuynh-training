@@ -18,12 +18,29 @@ from sklearn.pipeline import Pipeline
 
 @pytest.fixture
 def reduced_training_data() -> pd.DataFrame:
-    """Create reduced raw training data for train.py tests."""
+    """Create selected 15-field raw training data for train.py tests."""
     return pd.DataFrame(
         {
-            "LotFrontage": [70.0, np.nan, 60.0, 80.0, 55.0, 90.0, 65.0, 75.0],
-            "MasVnrArea": [100.0, 0.0, np.nan, 80.0, 120.0, 40.0, 60.0, 20.0],
+            "OverallQual": [7, 6, 8, 5, 8, 5, 9, 7],
+            "GrLivArea": [1710, 1262, 1786, 1100, 1980, 1150, 2100, 1500],
+            "GarageCars": [2.0, 2.0, 3.0, 1.0, 2.0, 1.0, 3.0, 2.0],
+            "GarageArea": [548.0, 460.0, 836.0, 300.0, 600.0, 280.0, 900.0, 500.0],
             "TotalBsmtSF": [856, 1262, 920, 756, 1145, 796, 1686, 1107],
+            "1stFlrSF": [856, 1262, 920, 756, 1145, 796, 1686, 1107],
+            "FullBath": [2, 2, 2, 1, 2, 1, 3, 2],
+            "TotRmsAbvGrd": [8, 6, 6, 5, 8, 5, 10, 7],
+            "YearBuilt": [2003, 1976, 2001, 1965, 2005, 1960, 2010, 1998],
+            "YearRemodAdd": [2003, 1976, 2002, 1990, 2005, 1980, 2011, 1999],
+            "Neighborhood": [
+                "CollgCr",
+                "Veenker",
+                "Crawfor",
+                "NAmes",
+                "NoRidge",
+                "OldTown",
+                "NridgHt",
+                "Somerst",
+            ],
             "GarageType": [
                 "Attchd",
                 np.nan,
@@ -34,8 +51,9 @@ def reduced_training_data() -> pd.DataFrame:
                 "Attchd",
                 "BuiltIn",
             ],
-            "Alley": [np.nan, "Grvl", np.nan, "Pave", np.nan, "Grvl", np.nan, "Pave"],
             "ExterQual": ["Gd", "TA", "TA", "Ex", "Gd", "TA", "Fa", "Gd"],
+            "KitchenQual": ["Gd", "TA", "Gd", "TA", "Ex", "TA", "Ex", "Gd"],
+            "BsmtQual": ["Gd", "TA", "Gd", "TA", "Ex", "TA", np.nan, "Gd"],
             "SalePrice": [
                 208500,
                 181500,
@@ -69,29 +87,31 @@ def _contains_simple_imputer(estimator: object) -> bool:
 def test_missing_value_imputer_uses_train_median_for_test() -> None:
     train_df = pd.DataFrame(
         {
-            "LotFrontage": [10.0, 30.0, 50.0],
-            "MasVnrArea": [1.0, 2.0, 3.0],
+            "GrLivArea": [1000.0, 1500.0, 2000.0],
+            "GarageArea": [200.0, 400.0, 600.0],
+            "Neighborhood": ["NAmes", "CollgCr", "Somerst"],
             "GarageType": ["Attchd", "Detchd", "BuiltIn"],
-            "Alley": ["Grvl", "Pave", np.nan],
             "ExterQual": ["TA", "Gd", "Ex"],
+            "BsmtQual": ["TA", "Gd", np.nan],
         }
     )
     test_df = pd.DataFrame(
         {
-            "LotFrontage": [np.nan, 1000.0, 2000.0],
-            "MasVnrArea": [10.0, 20.0, 30.0],
+            "GrLivArea": [np.nan, 2500.0, 3000.0],
+            "GarageArea": [100.0, 200.0, 300.0],
+            "Neighborhood": [np.nan, "NAmes", "Somerst"],
             "GarageType": [np.nan, "Attchd", "Detchd"],
-            "Alley": [np.nan, "Grvl", "Pave"],
             "ExterQual": ["TA", "Gd", "Ex"],
+            "BsmtQual": [np.nan, "TA", "Gd"],
         }
     )
 
     imputer = HousePricesMissingValueImputer().fit(train_df)
     transformed = imputer.transform(test_df)
 
-    assert transformed["LotFrontage"].iloc[0] == 30.0
+    assert transformed["GrLivArea"].iloc[0] == 1500.0
     assert transformed["GarageType"].iloc[0] == "None"
-    assert transformed["Alley"].iloc[0] == "None"
+    assert transformed["BsmtQual"].iloc[0] == "None"
 
 
 def test_build_pipeline_fits_without_engineered_columns(

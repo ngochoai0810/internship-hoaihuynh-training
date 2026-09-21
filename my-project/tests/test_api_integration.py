@@ -20,12 +20,21 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 VALID_PREDICTION = {
-    "lot_frontage": 70.0,
-    "mas_vnr_area": 100.0,
+    "overall_qual": 7,
+    "gr_liv_area": 1710.0,
+    "garage_cars": 2.0,
+    "garage_area": 548.0,
     "total_bsmt_sf": 856.0,
+    "first_flr_sf": 856.0,
+    "full_bath": 2,
+    "tot_rms_abv_grd": 8,
+    "year_built": 2003,
+    "year_remod_add": 2003,
+    "neighborhood": "CollgCr",
     "garage_type": "Attchd",
-    "alley": None,
     "exter_qual": "Gd",
+    "kitchen_qual": "Gd",
+    "bsmt_qual": "Gd",
 }
 
 
@@ -37,12 +46,21 @@ class InspectingModel:
 
     def predict(self, frame: pd.DataFrame) -> np.ndarray:
         assert list(frame.columns) == [
-            "LotFrontage",
-            "MasVnrArea",
+            "OverallQual",
+            "GrLivArea",
+            "GarageCars",
+            "GarageArea",
             "TotalBsmtSF",
+            "1stFlrSF",
+            "FullBath",
+            "TotRmsAbvGrd",
+            "YearBuilt",
+            "YearRemodAdd",
+            "Neighborhood",
             "GarageType",
-            "Alley",
             "ExterQual",
+            "KitchenQual",
+            "BsmtQual",
         ]
         return np.array([np.log1p(self.price)])
 
@@ -153,6 +171,72 @@ def test_authenticated_prediction_is_persisted(tmp_path: Path) -> None:
         assert history.predicted_price == 208_500.0
         assert history.model_sha256 == expected_sha256
         assert history.user.email == "week9@example.com"
+
+
+def test_prediction_history_returns_only_current_users_latest_records(
+    tmp_path: Path,
+) -> None:
+    app, _ = _create_test_app(tmp_path, InspectingModel(208_500.0))
+
+    with TestClient(app) as client:
+        token = _register_and_login(client)
+        headers = {"Authorization": f"Bearer {token}"}
+        first = client.post("/api/v1/predict", json=VALID_PREDICTION, headers=headers)
+        second = client.post(
+            "/api/v1/predict",
+            json={**VALID_PREDICTION, "overall_qual": 8},
+            headers=headers,
+        )
+        assert first.status_code == 201
+        assert second.status_code == 201
+
+        with app.state.session_factory() as session:
+            other_user = User(
+                email="other@example.com",
+                hashed_password="not-used-by-this-test",
+            )
+            session.add(other_user)
+            session.flush()
+            session.add(
+                PredictionHistory(
+                    user_id=other_user.id,
+                    input_payload=VALID_PREDICTION,
+                    predicted_price=999_999.0,
+                    model_sha256="b" * 64,
+                )
+            )
+            session.commit()
+
+        response = client.get(
+            "/api/v1/predictions/history?limit=1",
+            headers=headers,
+        )
+
+    assert response.status_code == 200
+    assert len(response.json()) == 1
+    latest = response.json()[0]
+    assert latest["id"] == second.json()["prediction_history_id"]
+    assert latest["input_payload"]["overall_qual"] == 8
+    assert latest["predicted_price"] == 208_500.0
+    assert latest["model_sha256"] == second.json()["model_sha256"]
+    assert isinstance(latest["created_at"], str)
+
+
+def test_prediction_history_requires_authentication_and_valid_limit(
+    tmp_path: Path,
+) -> None:
+    app, _ = _create_test_app(tmp_path, InspectingModel(208_500.0))
+
+    with TestClient(app) as client:
+        missing_token = client.get("/api/v1/predictions/history")
+        token = _register_and_login(client)
+        invalid_limit = client.get(
+            "/api/v1/predictions/history?limit=0",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    assert missing_token.status_code == 401
+    assert invalid_limit.status_code == 422
 
 
 def test_missing_token_does_not_create_history(tmp_path: Path) -> None:
@@ -308,7 +392,7 @@ def test_invalid_prediction_payload_is_rejected(tmp_path: Path) -> None:
         token = _register_and_login(client)
         response = client.post(
             "/api/v1/predict",
-            json={**VALID_PREDICTION, "lot_frontage": -1},
+            json={**VALID_PREDICTION, "overall_qual": -1},
             headers={"Authorization": f"Bearer {token}"},
         )
 

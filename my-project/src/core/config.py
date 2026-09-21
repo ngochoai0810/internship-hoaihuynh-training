@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     model_path: Path = PROJECT_DIR / "model.pkl"
     api_url: str = "http://localhost:8000"
     request_timeout: int = Field(default=10, gt=0)
+    log_level: str = "INFO"
 
     model_config = SettingsConfigDict(
         env_file=PROJECT_DIR.parent / ".env",

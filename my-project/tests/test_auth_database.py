@@ -22,7 +22,7 @@ def test_user_and_prediction_history_persist_expected_data() -> None:
         history = PredictionHistory(
             user=user,
             input_payload={
-                "lot_frontage": 70.0,
+                "overall_qual": 7,
                 "garage_type": "Attchd",
             },
             predicted_price=208_500.0,
@@ -33,7 +33,7 @@ def test_user_and_prediction_history_persist_expected_data() -> None:
         session.refresh(history)
 
         assert history.user_id == user.id
-        assert history.input_payload["lot_frontage"] == 70.0
+        assert history.input_payload["overall_qual"] == 7
         assert user.predictions == [history]
 
     columns = {

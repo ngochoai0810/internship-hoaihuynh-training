@@ -38,12 +38,21 @@ def build_model_frame(payload: PredictionInput) -> pd.DataFrame:
     return pd.DataFrame(
         [
             {
-                "LotFrontage": payload.lot_frontage,
-                "MasVnrArea": payload.mas_vnr_area,
+                "OverallQual": payload.overall_qual,
+                "GrLivArea": payload.gr_liv_area,
+                "GarageCars": payload.garage_cars,
+                "GarageArea": payload.garage_area,
                 "TotalBsmtSF": payload.total_bsmt_sf,
+                "1stFlrSF": payload.first_flr_sf,
+                "FullBath": payload.full_bath,
+                "TotRmsAbvGrd": payload.tot_rms_abv_grd,
+                "YearBuilt": payload.year_built,
+                "YearRemodAdd": payload.year_remod_add,
+                "Neighborhood": payload.neighborhood,
                 "GarageType": payload.garage_type,
-                "Alley": payload.alley,
                 "ExterQual": payload.exter_qual,
+                "KitchenQual": payload.kitchen_qual,
+                "BsmtQual": payload.bsmt_qual,
             }
         ]
     )

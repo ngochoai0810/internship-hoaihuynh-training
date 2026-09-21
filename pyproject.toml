@@ -7,7 +7,7 @@ name = "internship-hoaihuynh-training"
 version = "0.1.0"
 description = "Internship training project for backend and ML integration."
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 authors = [
   { name = "Hoai Huynh" }
 ]
@@ -18,10 +18,11 @@ where = ["my-project/src"]
 [tool.pytest.ini_options]
 testpaths = ["my-project/tests"]
 pythonpath = ["my-project/src"]
-cache_dir = ".pytest-tmp/cache"
+cache_dir = "my-project/.pytest-cache"
+addopts = "--basetemp=my-project/.pytest-basetemp"
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.12"
 ignore_missing_imports = true
 strict = true
 disallow_untyped_defs = true
@@ -31,27 +32,47 @@ warn_return_any = true
 
 [tool.black]
 line-length = 88
-target-version = ["py311"]
+target-version = ["py312"]
 extend-exclude = '''
-/(
-  \.git
+(^|/)(
+    \.agents
+  | \.black-cache
+  | \.codex
+  | \.git
   | \.mypy_cache
   | \.pytest_cache
+  | \.pytest-tmp
   | \.venv
   | \.venv-1
+  | \.ruff_cache
+  | \.superpowers
+  | \.worktrees
+  | my-project/\.pytest-basetemp
+  | my-project/\.pytest-cache
+  | my-project/\.pytest-cache-audit
   | my-project/notebooks
-)/
+)(/|$)
 '''
 
 [tool.ruff]
 line-length = 88
-target-version = "py311"
+target-version = "py312"
 exclude = [
   ".git",
+  ".agents",
+  ".black-cache",
+  ".codex",
   ".mypy_cache",
   ".pytest_cache",
+  ".pytest-tmp",
+  "my-project/.pytest-basetemp",
+  "my-project/.pytest-cache",
+  "my-project/.pytest-cache-audit",
   ".venv",
   ".venv-1",
+  ".ruff_cache",
+  ".superpowers",
+  ".worktrees",
   "my-project/notebooks",
 ]
 

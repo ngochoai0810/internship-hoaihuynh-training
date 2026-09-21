@@ -3,7 +3,17 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
-from ml.preprocessing import engineer_features, handle_missing_values, preprocess_train
+from ml.preprocessing import (
+    FEATURE_COLUMNS,
+    NOMINAL_FEATURES,
+    NUMERIC_FEATURES,
+    ORDINAL_FEATURES,
+    TARGET_COLUMN,
+    engineer_features,
+    fit_transform_house_prices,
+    handle_missing_values,
+    preprocess_train,
+)
 
 
 @pytest.fixture
@@ -49,6 +59,51 @@ def mock_feature_data() -> pd.DataFrame:
             "YearRemodAdd": [2005, 2018],
         }
     )
+
+
+@pytest.fixture
+def selected_feature_data() -> pd.DataFrame:
+    """Create compact data covering the default 15 selected features."""
+    return pd.DataFrame(
+        {
+            "OverallQual": [7, 5, 8],
+            "GrLivArea": [1710, 1262, 1786],
+            "GarageCars": [2.0, np.nan, 3.0],
+            "GarageArea": [548.0, np.nan, 836.0],
+            "TotalBsmtSF": [856.0, np.nan, 920.0],
+            "1stFlrSF": [856, 1262, 920],
+            "FullBath": [2, 2, 2],
+            "TotRmsAbvGrd": [8, 6, 6],
+            "YearBuilt": [2003, 1976, 2001],
+            "YearRemodAdd": [2003, 1976, 2002],
+            "Neighborhood": ["CollgCr", "Veenker", "Crawfor"],
+            "GarageType": ["Attchd", np.nan, "BuiltIn"],
+            "ExterQual": ["Gd", "TA", "Ex"],
+            "KitchenQual": ["Gd", np.nan, "Ex"],
+            "BsmtQual": ["Gd", np.nan, "Ex"],
+            "SalePrice": [208500, 181500, 223500],
+        }
+    )
+
+
+def test_default_feature_constants_cover_15_fields() -> None:
+    assert len(FEATURE_COLUMNS) == 15
+    assert TARGET_COLUMN not in FEATURE_COLUMNS
+    assert FEATURE_COLUMNS == NUMERIC_FEATURES + NOMINAL_FEATURES + ORDINAL_FEATURES
+    assert NUMERIC_FEATURES == [
+        "OverallQual",
+        "GrLivArea",
+        "GarageCars",
+        "GarageArea",
+        "TotalBsmtSF",
+        "1stFlrSF",
+        "FullBath",
+        "TotRmsAbvGrd",
+        "YearBuilt",
+        "YearRemodAdd",
+    ]
+    assert NOMINAL_FEATURES == ["Neighborhood", "GarageType"]
+    assert ORDINAL_FEATURES == ["ExterQual", "KitchenQual", "BsmtQual"]
 
 
 def test_missing_required_columns() -> None:
@@ -119,3 +174,42 @@ def test_preprocess_train_pipeline(
 
     assert np.isclose(mean_val, 0, atol=1e-7)
     assert np.isclose(std_val, 1, atol=1e-7)
+
+
+def test_preprocess_train_defaults_to_selected_15_fields(
+    selected_feature_data: pd.DataFrame, tmp_path: Path
+) -> None:
+    save_filepath = tmp_path / "house_prices_preprocessor.pkl"
+
+    x_processed = preprocess_train(
+        df=selected_feature_data.drop(columns=[TARGET_COLUMN]),
+        save_path=str(save_filepath),
+    )
+
+    assert save_filepath.exists()
+    assert isinstance(x_processed, np.ndarray)
+    assert x_processed.shape[0] == len(selected_feature_data)
+    assert x_processed.shape[1] > len(FEATURE_COLUMNS)
+    assert np.isfinite(x_processed).all()
+
+
+def test_fit_transform_house_prices_writes_processed_dataframe(
+    selected_feature_data: pd.DataFrame, tmp_path: Path
+) -> None:
+    preprocessor_path = tmp_path / "house_prices_preprocessor.pkl"
+    processed_csv_path = tmp_path / "processed_train.csv"
+
+    processed = fit_transform_house_prices(
+        df=selected_feature_data,
+        preprocessor_path=preprocessor_path,
+        processed_csv_path=processed_csv_path,
+    )
+
+    assert preprocessor_path.exists()
+    assert processed_csv_path.exists()
+    assert processed.shape[0] == len(selected_feature_data)
+    assert TARGET_COLUMN in processed.columns
+    assert "SalePriceLog" in processed.columns
+    assert processed.isna().sum().sum() == 0
+    assert any(col.startswith("cat__Neighborhood_") for col in processed.columns)
+    assert list(pd.read_csv(processed_csv_path).columns) == list(processed.columns)

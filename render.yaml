@@ -1,0 +1,39 @@
+services:
+  - type: web
+    name: house-price-api
+    runtime: python
+    plan: free
+    buildCommand: bash my-project/scripts/render_build.sh
+    startCommand: bash my-project/scripts/render_start_api.sh
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.11
+      - key: SECRET_KEY
+        sync: false
+      - key: KAGGLE_USERNAME
+        sync: false
+      - key: KAGGLE_KEY
+        sync: false
+      - key: RENDER_DISK_MOUNT
+        value: /tmp
+      - key: DATABASE_URL
+        value: sqlite:////tmp/app.db
+      - key: MODEL_PATH
+        value: my-project/model.pkl
+      - key: LOG_LEVEL
+        value: INFO
+
+  - type: web
+    name: house-price-ui
+    runtime: python
+    plan: free
+    buildCommand: python -m pip install --upgrade pip && python -m pip install -r requirements.txt && python -m pip install -e .
+    startCommand: bash my-project/scripts/render_start_streamlit.sh
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.11
+      - key: API_URL
+        value: https://house-price-api.onrender.com
+      - key: REQUEST_TIMEOUT
+        value: "10"
