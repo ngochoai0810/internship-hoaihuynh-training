@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = Field(default=30, gt=0)
     database_url: str = f"sqlite:///{(PROJECT_DIR / 'app.db').as_posix()}"
     model_path: Path = PROJECT_DIR / "model.pkl"
+    final_artifacts_dir: Path = PROJECT_DIR / "artifacts" / "final"
     api_url: str = "http://localhost:8000"
     request_timeout: int = Field(default=10, gt=0)
     log_level: str = "INFO"

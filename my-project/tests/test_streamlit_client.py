@@ -153,6 +153,40 @@ def test_prediction_history_uses_bearer_token_and_limit() -> None:
     }
 
 
+def test_demo_artifacts_use_bearer_token() -> None:
+    payload = {
+        "model_sha256": "a" * 64,
+        "sample": None,
+        "evaluation": None,
+    }
+    transport = RecordingTransport(FakeResponse(200, payload))
+    client = ApiClient("http://localhost:8000", timeout=5, transport=transport)
+
+    result = client.demo_artifacts(token="jwt-token")
+
+    assert result.ok
+    assert result.data == payload
+    assert transport.last_get == {
+        "url": "http://localhost:8000/api/v1/demo",
+        "headers": {"Authorization": "Bearer jwt-token"},
+        "timeout": 5,
+    }
+
+
+def test_demo_artifact_connection_error_keeps_manual_demo_available() -> None:
+    client = ApiClient(
+        "http://localhost:8000",
+        timeout=5,
+        transport=FailingTransport(),
+    )
+
+    result = client.demo_artifacts(token="jwt-token")
+
+    assert not result.ok
+    assert result.data is None
+    assert "Cannot connect" in result.message
+
+
 def test_health_connection_error_returns_user_facing_result() -> None:
     client = ApiClient(
         "http://localhost:8000",

@@ -106,6 +106,14 @@ class VerifiedModelEvaluation:
     metrics: dict[str, float]
 
 
+@dataclass(frozen=True)
+class DemoArtifacts:
+    """Demo data fetched from the API service that owns the active model."""
+
+    sample: HoldoutSample | None
+    evaluation: VerifiedModelEvaluation | None
+
+
 def _read_json(path: Path) -> Any | None:
     """Return parsed JSON, or None when the artifact has not been produced."""
 
@@ -151,11 +159,61 @@ def load_verified_evaluation(
     )
 
 
+def parse_demo_artifacts(payload: dict[str, Any] | None) -> DemoArtifacts:
+    """Convert the API response into presentation objects, tolerating gaps."""
+
+    if not payload:
+        return DemoArtifacts(sample=None, evaluation=None)
+
+    sample: HoldoutSample | None = None
+    sample_data = payload.get("sample")
+    if isinstance(sample_data, dict):
+        try:
+            sample = HoldoutSample(
+                sample_id=sample_data.get("id"),
+                actual_price=float(sample_data["actual_price"]),
+                payload=dict(sample_data["payload"]),
+            )
+        except (KeyError, TypeError, ValueError):
+            sample = None
+
+    evaluation: VerifiedModelEvaluation | None = None
+    evaluation_data = payload.get("evaluation")
+    if isinstance(evaluation_data, dict):
+        try:
+            metrics = evaluation_data["metrics"]
+            evaluation = VerifiedModelEvaluation(
+                model_sha256=str(evaluation_data["model_sha256"]),
+                source_dataset=str(evaluation_data["source_dataset"]),
+                test_size=float(evaluation_data["test_size"]),
+                split_random_state=int(evaluation_data["split_random_state"]),
+                metrics={
+                    label: float(metrics[key])
+                    for key, label in METRIC_LABELS.items()
+                    if key in metrics
+                },
+            )
+        except (KeyError, TypeError, ValueError):
+            evaluation = None
+
+    return DemoArtifacts(sample=sample, evaluation=evaluation)
+
+
 HOLDOUT_SAMPLE: HoldoutSample | None = load_holdout_sample()
 VERIFIED_MODEL_EVALUATION: VerifiedModelEvaluation | None = load_verified_evaluation()
-BENCHMARK_PAYLOAD: dict[str, Any] = (
-    HOLDOUT_SAMPLE.payload if HOLDOUT_SAMPLE is not None else MANUAL_DEFAULT_PAYLOAD
+LOCAL_DEMO_ARTIFACTS = DemoArtifacts(
+    sample=HOLDOUT_SAMPLE,
+    evaluation=VERIFIED_MODEL_EVALUATION,
 )
+
+
+def benchmark_payload(artifacts: DemoArtifacts) -> dict[str, Any]:
+    if artifacts.sample is not None:
+        return artifacts.sample.payload
+    return MANUAL_DEFAULT_PAYLOAD
+
+
+BENCHMARK_PAYLOAD: dict[str, Any] = benchmark_payload(LOCAL_DEMO_ARTIFACTS)
 
 
 def get_verified_evaluation(model_sha256: str) -> VerifiedModelEvaluation | None:

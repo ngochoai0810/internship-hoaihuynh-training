@@ -115,3 +115,18 @@ class ApiClient:
         if response.status_code == 401:
             return ApiResult(False, "Session expired. Please log in again.")
         return self._error(response)
+
+    def demo_artifacts(self, *, token: str) -> ApiResult:
+        try:
+            response = self.transport.get(
+                f"{self.api_url}/api/v1/demo",
+                headers={"Authorization": f"Bearer {token}"},
+                timeout=self.timeout,
+            )
+        except requests.RequestException:
+            return ApiResult(False, f"Cannot connect to {self.api_url}")
+        if response.status_code == 200:
+            return ApiResult(True, "Demo artifacts loaded", response.json())
+        if response.status_code == 401:
+            return ApiResult(False, "Session expired. Please log in again.")
+        return self._error(response)

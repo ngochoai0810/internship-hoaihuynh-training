@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from time import perf_counter
 from uuid import uuid4
 
-from api.routes import auth, prediction
+from api.routes import auth, demo, prediction
 from core.config import Settings, get_settings
 from core.logging import configure_logging
 from database import create_database
@@ -52,6 +52,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_headers=["*"],
     )
     application.include_router(auth.router, prefix=app_settings.api_v1_prefix)
+    application.include_router(demo.router, prefix=app_settings.api_v1_prefix)
     application.include_router(prediction.router, prefix=app_settings.api_v1_prefix)
 
     @application.middleware("http")

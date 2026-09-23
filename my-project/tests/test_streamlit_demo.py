@@ -98,6 +98,73 @@ def test_verified_evaluation_reads_final_holdout_metrics(tmp_path: Path) -> None
     }
 
 
+def test_demo_artifacts_are_parsed_from_the_api_response() -> None:
+    demo = import_module("streamlit_app.demo")
+
+    artifacts = demo.parse_demo_artifacts(
+        {
+            "model_sha256": MODEL_SHA256,
+            "sample": DEMO_SAMPLE,
+            "evaluation": {
+                "model_sha256": MODEL_SHA256,
+                "source_dataset": "my-project/data/raw/train.csv",
+                "test_size": 0.2,
+                "split_random_state": 42,
+                "metrics": FINAL_REPORT["metrics"],
+            },
+        }
+    )
+
+    assert artifacts.sample is not None
+    assert artifacts.sample.sample_id == 605
+    assert artifacts.sample.payload == DEMO_SAMPLE["payload"]
+    assert artifacts.evaluation is not None
+    assert artifacts.evaluation.model_sha256 == MODEL_SHA256
+    assert artifacts.evaluation.metrics == {
+        "RMSE log": pytest.approx(0.255751),
+        "MAE log": pytest.approx(0.187704),
+        "R²": pytest.approx(0.631583),
+    }
+
+
+def test_missing_api_demo_artifacts_keep_manual_defaults_available() -> None:
+    demo = import_module("streamlit_app.demo")
+
+    artifacts = demo.parse_demo_artifacts(None)
+
+    assert artifacts.sample is None
+    assert artifacts.evaluation is None
+    assert demo.benchmark_payload(artifacts) == demo.MANUAL_DEFAULT_PAYLOAD
+
+
+def test_api_demo_artifacts_enable_the_holdout_selector() -> None:
+    api_payload = {
+        "model_sha256": MODEL_SHA256,
+        "sample": DEMO_SAMPLE,
+        "evaluation": {
+            "model_sha256": MODEL_SHA256,
+            "source_dataset": "my-project/data/raw/train.csv",
+            "test_size": 0.2,
+            "split_random_state": 42,
+            "metrics": FINAL_REPORT["metrics"],
+        },
+    }
+    rendered = AppTest.from_string(f"""
+from streamlit_app import app, demo
+from streamlit_app.client import ApiResult
+
+app.initialize_session()
+app.render_prediction(
+    ApiResult(True, "ok", {{"model_sha256": {MODEL_SHA256!r}}}),
+    demo.parse_demo_artifacts({api_payload!r}),
+)
+""").run(timeout=10)
+
+    assert not rendered.exception
+    assert len(rendered.radio) == 1
+    assert not rendered.info
+
+
 def test_evaluation_is_only_attributed_to_its_exact_model_hash(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
