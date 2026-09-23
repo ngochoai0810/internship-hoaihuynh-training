@@ -32,6 +32,6 @@ services:
       - key: PYTHON_VERSION
         value: 3.13.11
       - key: API_URL
-        value: https://house-price-api.onrender.com
+        value: https://house-price-api-ivtb.onrender.com
       - key: REQUEST_TIMEOUT
         value: "10"
