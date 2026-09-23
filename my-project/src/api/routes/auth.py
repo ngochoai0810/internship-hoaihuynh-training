@@ -15,6 +15,27 @@ from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
+DEMO_EMAIL = "demo@gmail.com"
+DEMO_PASSWORD = "demo123456"
+
+
+def ensure_demo_account(db: Session) -> User | None:
+    """Create the default demo user once on a fresh database."""
+
+    email = DEMO_EMAIL.lower()
+    user = db.scalar(select(User).where(User.email == email))
+    if user is not None:
+        return user
+
+    demo_user = User(
+        email=email,
+        hashed_password=hash_password(DEMO_PASSWORD),
+    )
+    db.add(demo_user)
+    db.commit()
+    db.refresh(demo_user)
+    return demo_user
+
 
 @router.post(
     "/register",
@@ -52,7 +73,14 @@ def login(
 ) -> TokenResponse:
     """Authenticate an email/password pair and issue a Bearer JWT."""
 
-    user = db.scalar(select(User).where(User.email == form_data.username.lower()))
+    username = form_data.username.lower()
+    if username == DEMO_EMAIL and form_data.password == DEMO_PASSWORD:
+        user = db.scalar(select(User).where(User.email == username))
+        if user is None:
+            user = ensure_demo_account(db)
+    else:
+        user = db.scalar(select(User).where(User.email == username))
+
     if user is None or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

@@ -7,10 +7,12 @@ from time import perf_counter
 from uuid import uuid4
 
 from api.routes import auth, demo, prediction
+from api.routes.auth import ensure_demo_account
 from core.config import Settings, get_settings
 from core.logging import configure_logging
 from database import create_database
 from fastapi import FastAPI, Request
+from models import Base
 from fastapi.middleware.cors import CORSMiddleware
 from ml.runtime import load_model_artifact
 from schemas.prediction import HealthResponse
@@ -43,6 +45,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     application.state.settings = app_settings
     application.state.engine = engine
     application.state.session_factory = session_factory
+
+    Base.metadata.create_all(bind=engine)
+    with session_factory() as session:
+        ensure_demo_account(session)
 
     application.add_middleware(
         CORSMiddleware,

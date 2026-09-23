@@ -114,6 +114,20 @@ def _register_and_login(client: TestClient) -> str:
     return str(login_response.json()["access_token"])
 
 
+def test_demo_login_auto_creates_account_when_database_is_empty(tmp_path: Path) -> None:
+    app, model_path = _create_test_app(tmp_path, InspectingModel(208_500.0))
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/auth/login",
+            data={"username": "demo@gmail.com", "password": "demo123456"},
+        )
+
+    assert response.status_code == 200
+    assert "access_token" in response.json()
+    assert response.json()["token_type"] == "bearer"
+
+
 def _write_demo_artifacts(tmp_path: Path, model_sha256: str) -> None:
     artifacts_dir = tmp_path / "artifacts" / "final"
     artifacts_dir.mkdir(parents=True)
