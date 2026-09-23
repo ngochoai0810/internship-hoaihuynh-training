@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from collections.abc import Generator
 from datetime import timedelta
 from pathlib import Path
@@ -85,6 +86,7 @@ def _settings(tmp_path: Path, model_path: Path) -> Settings:
         secret_key="test-secret-key-that-is-long-enough",
         database_url=f"sqlite:///{(tmp_path / 'test.db').as_posix()}",
         model_path=model_path,
+        final_artifacts_dir=tmp_path / "artifacts" / "final",
     )
 
 
@@ -112,6 +114,39 @@ def _register_and_login(client: TestClient) -> str:
     return str(login_response.json()["access_token"])
 
 
+def _write_demo_artifacts(tmp_path: Path, model_sha256: str) -> None:
+    artifacts_dir = tmp_path / "artifacts" / "final"
+    artifacts_dir.mkdir(parents=True)
+    (artifacts_dir / "demo_samples.json").write_text(
+        json.dumps(
+            [
+                {
+                    "id": 605,
+                    "actual_price": 221_000.0,
+                    "payload": VALID_PREDICTION,
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (artifacts_dir / "final_holdout_report.json").write_text(
+        json.dumps(
+            {
+                "model_sha256": model_sha256,
+                "data_path": "my-project/data/raw/train.csv",
+                "test_size": 0.2,
+                "random_state": 42,
+                "metrics": {
+                    "rmse_log": 0.255751,
+                    "mae_log": 0.187704,
+                    "r2_log": 0.631583,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
 def test_lifespan_loads_artifact_and_health_reports_fingerprint(
     tmp_path: Path,
 ) -> None:
@@ -127,6 +162,79 @@ def test_lifespan_loads_artifact_and_health_reports_fingerprint(
         "model_loaded": True,
         "model_sha256": expected_sha256,
     }
+
+
+def test_authenticated_demo_artifacts_match_the_loaded_model(tmp_path: Path) -> None:
+    app, model_path = _create_test_app(tmp_path, InspectingModel(208_500.0))
+    model_sha256 = hashlib.sha256(model_path.read_bytes()).hexdigest()
+    _write_demo_artifacts(tmp_path, model_sha256)
+
+    with TestClient(app) as client:
+        token = _register_and_login(client)
+        response = client.get(
+            "/api/v1/demo",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "model_sha256": model_sha256,
+        "sample": {
+            "id": 605,
+            "actual_price": 221_000.0,
+            "payload": VALID_PREDICTION,
+        },
+        "evaluation": {
+            "model_sha256": model_sha256,
+            "source_dataset": "my-project/data/raw/train.csv",
+            "test_size": 0.2,
+            "split_random_state": 42,
+            "metrics": {
+                "rmse_log": 0.255751,
+                "mae_log": 0.187704,
+                "r2_log": 0.631583,
+            },
+        },
+    }
+
+
+def test_demo_artifacts_require_authentication_and_tolerate_missing_files(
+    tmp_path: Path,
+) -> None:
+    app, _ = _create_test_app(tmp_path, InspectingModel(208_500.0))
+
+    with TestClient(app) as client:
+        missing_token = client.get("/api/v1/demo")
+        token = _register_and_login(client)
+        missing_artifacts = client.get(
+            "/api/v1/demo",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    assert missing_token.status_code == 401
+    assert missing_artifacts.status_code == 200
+    assert missing_artifacts.json()["sample"] is None
+    assert missing_artifacts.json()["evaluation"] is None
+
+
+def test_demo_artifacts_do_not_attribute_metrics_to_a_different_model(
+    tmp_path: Path,
+) -> None:
+    app, model_path = _create_test_app(tmp_path, InspectingModel(208_500.0))
+    active_model_sha256 = hashlib.sha256(model_path.read_bytes()).hexdigest()
+    _write_demo_artifacts(tmp_path, "b" * 64)
+
+    with TestClient(app) as client:
+        token = _register_and_login(client)
+        response = client.get(
+            "/api/v1/demo",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["model_sha256"] == active_model_sha256
+    assert response.json()["sample"]["id"] == 605
+    assert response.json()["evaluation"] is None
 
 
 @pytest.mark.parametrize("artifact", [None, b"not-a-joblib-model"])

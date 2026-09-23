@@ -17,12 +17,15 @@ from streamlit_app.demo import (
     DEMO_TOTAL_REQUESTS,
     GARAGE_TYPE_OPTIONS,
     HOLDOUT_SAMPLE,
+    LOCAL_DEMO_ARTIFACTS,
     MANUAL_DEFAULT_PAYLOAD,
     NEIGHBORHOOD_OPTIONS,
     QUALITY_OPTIONS,
+    DemoArtifacts,
+    HoldoutSample,
     compare_prediction,
     format_history_rows,
-    get_verified_evaluation,
+    parse_demo_artifacts,
 )
 
 load_dotenv(Path(__file__).resolve().parents[3] / ".env")
@@ -108,12 +111,15 @@ def render_overview(health: ApiResult) -> None:
         st.rerun()
 
 
-def _prediction_payload(use_holdout: bool) -> dict[str, Any] | None:
+def _prediction_payload(
+    use_holdout: bool,
+    holdout_sample: HoldoutSample | None = HOLDOUT_SAMPLE,
+) -> dict[str, Any] | None:
     """Render the prediction form and return values only after submission."""
 
     defaults: dict[str, Any] = (
-        HOLDOUT_SAMPLE.payload
-        if use_holdout and HOLDOUT_SAMPLE is not None
+        holdout_sample.payload
+        if use_holdout and holdout_sample is not None
         else MANUAL_DEFAULT_PAYLOAD
     )
 
@@ -258,26 +264,35 @@ def _prediction_payload(use_holdout: bool) -> dict[str, Any] | None:
     }
 
 
-def render_prediction(health: ApiResult) -> None:
+def render_prediction(
+    health: ApiResult,
+    demo_artifacts: DemoArtifacts = LOCAL_DEMO_ARTIFACTS,
+) -> None:
     """Run one prediction and optionally compare it with a known target."""
 
     st.subheader("Dự đoán và đối chiếu đáp án")
     health_hash = ""
     if health.ok and health.data is not None:
         health_hash = str(health.data.get("model_sha256", ""))
-    verified_evaluation = get_verified_evaluation(health_hash)
+    holdout_sample = demo_artifacts.sample
+    verified_evaluation = demo_artifacts.evaluation
+    if (
+        verified_evaluation is not None
+        and verified_evaluation.model_sha256 != health_hash
+    ):
+        verified_evaluation = None
 
     use_reference_sample = False
-    if HOLDOUT_SAMPLE is None:
+    if holdout_sample is None:
         st.info(
-            "Chưa có mẫu holdout. Chạy `python -m ml.finalize` để sinh "
-            "`artifacts/final/demo_samples.json` rồi mở lại trang này."
+            "Backend chưa cung cấp mẫu holdout. Bạn vẫn có thể nhập dữ liệu "
+            "thủ công để dự đoán."
         )
     else:
         sample_label = (
-            f"Mẫu holdout — Id {HOLDOUT_SAMPLE.sample_id}"
+            f"Mẫu holdout — Id {holdout_sample.sample_id}"
             if verified_evaluation is not None
-            else f"Mẫu tham chiếu — Id {HOLDOUT_SAMPLE.sample_id}"
+            else f"Mẫu tham chiếu — Id {holdout_sample.sample_id}"
         )
         sample_mode = st.radio(
             "Nguồn dữ liệu",
@@ -288,12 +303,11 @@ def render_prediction(health: ApiResult) -> None:
         if use_reference_sample and verified_evaluation is None:
             st.warning(
                 "Model hiện tại không khớp artifact đã xác minh. "
-                f"Id {HOLDOUT_SAMPLE.sample_id} chỉ được dùng làm mẫu tham chiếu "
-                f"có SalePrice ${HOLDOUT_SAMPLE.actual_price:,.0f}, không được "
+                f"Id {holdout_sample.sample_id} chỉ được dùng làm mẫu tham chiếu "
+                f"có SalePrice ${holdout_sample.actual_price:,.0f}, không được "
                 "gọi là holdout của model này."
             )
-    # Lấy token từ session
-    payload = _prediction_payload(use_reference_sample)
+    payload = _prediction_payload(use_reference_sample, holdout_sample)
     if payload is None:
         return
 
@@ -304,13 +318,13 @@ def render_prediction(health: ApiResult) -> None:
 
     predicted_price = float(result.data["predicted_price"])
     model_hash = str(result.data["model_sha256"])
-    if use_reference_sample and HOLDOUT_SAMPLE is not None:
+    if use_reference_sample and holdout_sample is not None:
         comparison = compare_prediction(
             predicted_price=predicted_price,
-            actual_price=HOLDOUT_SAMPLE.actual_price,
+            actual_price=holdout_sample.actual_price,
         )
         actual_column, predicted_column, difference_column, error_column = st.columns(4)
-        actual_column.metric("Giá thật", f"${HOLDOUT_SAMPLE.actual_price:,.0f}")
+        actual_column.metric("Giá thật", f"${holdout_sample.actual_price:,.0f}")
         predicted_column.metric("Giá dự đoán", f"${predicted_price:,.2f}")
         difference_column.metric(
             "Chênh lệch tuyệt đối", f"${comparison.absolute_error:,.2f}"
@@ -318,7 +332,12 @@ def render_prediction(health: ApiResult) -> None:
         error_column.metric(
             "Sai số mẫu tham chiếu", f"{comparison.percentage_error:.2f}%"
         )
-        response_evaluation = get_verified_evaluation(model_hash)
+        response_evaluation = verified_evaluation
+        if (
+            response_evaluation is not None
+            and response_evaluation.model_sha256 != model_hash
+        ):
+            response_evaluation = None
         if response_evaluation is not None:
             st.caption(
                 " "
@@ -464,6 +483,12 @@ def render_dashboard() -> None:
     """Render the authenticated four-tab presentation dashboard."""
 
     health = CLIENT.health()
+    demo_result = CLIENT.demo_artifacts(token=str(st.session_state["token"]))
+    demo_artifacts = (
+        parse_demo_artifacts(demo_result.data)
+        if demo_result.ok
+        else LOCAL_DEMO_ARTIFACTS
+    )
     render_status_header(health)
     overview_tab, prediction_tab, load_tab, history_tab = st.tabs(
         ["Tổng quan", "Dự đoán & đối chiếu", "Load test", "Lịch sử"]
@@ -471,7 +496,7 @@ def render_dashboard() -> None:
     with overview_tab:
         render_overview(health)
     with prediction_tab:
-        render_prediction(health)
+        render_prediction(health, demo_artifacts)
     with load_tab:
         render_load_test(health)
     with history_tab:
