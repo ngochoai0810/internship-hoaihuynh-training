@@ -1,240 +1,175 @@
-# House Price Prediction - Backend and ML Integration
+# House Price Prediction with Regularised and Ensemble Regression: A Reproducible Train-to-Serve Pipeline
 
-This project implements the internship training roadmap with a FastAPI backend,
-SQLite/SQLAlchemy persistence, JWT authentication, a Streamlit client, and a
-Kaggle House Prices regression pipeline. The app supports local development,
-manual retraining, and Render deployment with build-time model packaging.
+> An end-to-end regression system that selects models under a pre-registered cross-validation rule and serves them through a JWT-authenticated FastAPI backend.
 
-## Architecture
+**Huỳnh Thị Ngọc Hoài — ML Engineer & Backend Developer**
 
-```text
-Streamlit UI
-  -> FastAPI auth and prediction routes
-      -> JWT dependency
-      -> SQLAlchemy sessions
-      -> SQLite users and prediction_history tables
-      -> sklearn pipeline loaded once during FastAPI lifespan
-```
+**Core stack:** Python · scikit-learn · FastAPI · SQLAlchemy · Streamlit · Render
+
+## Project Overview
+
+On small tabular datasets, ensembles often edge out linear baselines by margins that sit inside cross-validation noise. Selecting a model on mean CV score alone therefore risks deploying added complexity with no real gain.
+
+This project works on the Kaggle House Prices dataset with a log-transformed target. It compares Ridge, Random Forest, and Gradient Boosting under 5-fold CV and adopts a challenger only if it beats the incumbent by **more than one CV standard deviation**. The selected model is packaged as a versioned artifact and served through a JWT-authenticated FastAPI service with a Streamlit client.
+
+## My Role and Contributions
+
+- **Data and preprocessing:** EDA on missing values, outliers, encoding, and scaling; a typed scikit-learn preprocessing pipeline over 15 selected features.
+- **Modelling:** linear and Ridge baselines, Ridge alpha tuning, and a Round 3 comparison of Random Forest, Gradient Boosting, and stacking.
+- **Selection protocol:** a pre-registered switching rule (`ensemble_round3.passes_selection_threshold`) and an untouched final holdout used only for reporting.
+- **Serving:** FastAPI auth and prediction routes, the model loaded once during the app lifespan, and `model_sha256` exposed on `/health`.
+- **Persistence:** SQLAlchemy entities with audit fields, user-linked prediction history, and Alembic migrations.
+- **Deployment and quality:** a Render Blueprint with build-time model packaging, request logging with redacted secrets, and a 128-test suite.
+
+## System Architecture
 
 ```mermaid
 flowchart LR
-    Kaggle[Kaggle train.csv] --> Preprocess[Typed preprocessing pipeline]
-    Preprocess --> Baseline[Linear and Ridge baselines]
-    Baseline --> Tuning[Ridge alpha tuning]
-    Tuning --> Ensemble[Random Forest / Gradient Boosting / Stacking comparison]
-    Ensemble --> Finalize[Final holdout packaging]
-    Finalize --> Model[model.pkl]
-    Model --> API[FastAPI lifespan load]
-    UI[Streamlit] --> Auth[JWT auth]
-    Auth --> API
-    API --> History[(prediction_history)]
+    A[Kaggle train.csv] --> B[Typed preprocessing<br/>15 features]
+    B --> C[Linear / Ridge<br/>baselines]
+    C --> D[Ridge alpha tuning]
+    D --> E[RF / GB / Stacking<br/>5-fold CV]
+    E --> F[Selection rule<br/>gain > 1 CV SD]
+    F --> G[Final holdout<br/>report only]
+    G --> H[model.pkl + metadata]
+    H --> I[FastAPI<br/>lifespan load]
+    J[Streamlit UI] --> K[JWT auth]
+    K --> I
+    I --> L[(SQLite<br/>prediction_history)]
 ```
 
-Important runtime paths:
+Models can be swapped by replacing the versioned artifact and restarting the API. Routes and the Streamlit client stay unchanged.
 
-- `my-project/src/api/`: FastAPI app, auth routes, prediction routes, request logging.
-- `my-project/src/ml/`: preprocessing, training, evaluation, final model packaging.
-- `my-project/src/models/`: SQLAlchemy entities with shared audit fields.
-- `my-project/src/schemas/`: Pydantic request/response contracts.
-- `my-project/src/streamlit_app/`: login, prediction, history, and demo UI.
-- `my-project/alembic/`: database migration history.
+## Technical Foundations
 
-Generated CSV files, SQLite databases, experiment artifacts, `.env`, and
-`my-project/model.pkl` are intentionally not committed.
+### 1. Log-target regression
 
-## Local Setup
+`SalePrice` is right-skewed, so models train on `log1p(SalePrice)` and predictions are inverted with `expm1`. RMSE on the log scale penalises relative errors evenly across cheap and expensive houses. This matches the Kaggle metric.
 
-From the repository root in PowerShell:
+### 2. Regularisation
+
+Ridge adds an L2 penalty `α‖β‖²` that shrinks correlated coefficients and stabilises estimates on 1,168 training rows. Alpha is tuned with cross-validation inside the training portion only.
+
+### 3. Ensembles
+
+Random Forest averages decorrelated deep trees to reduce variance. Gradient Boosting fits shallow trees sequentially to the residuals to reduce bias. Twelve Gradient Boosting configurations were searched on the same folds used in the comparison.
+
+### 4. Noise-aware model selection
+
+A challenger replaces the incumbent only if:
+
+```math
+\overline{\mathrm{RMSE}}_{\text{incumbent}} - \overline{\mathrm{RMSE}}_{\text{challenger}} > \mathrm{SD}_{\text{incumbent}}
+```
+
+The rule is fixed before results are seen. The holdout split is made before CV and is read once at the end, so it never drives a model choice.
+
+## Results
+
+5-fold CV on 1,168 rows (log RMSE, mean ± SD):
+
+| Model | CV RMSE (log) | Gain vs Ridge | Passes rule |
+|---|---:|---:|:---:|
+| **Ridge (α = 1.0)** | **0.158 ± 0.028** | — | selected |
+| Random Forest (500 trees) | 0.159 ± 0.013 | −0.3% | no |
+| Gradient Boosting (depth 2, 300 trees) | 0.146 ± 0.014 | +7.9% | no |
+
+Gradient Boosting was 7.9% better than Ridge and won on all five folds. However, the 0.0125 gain stayed below Ridge's CV SD of 0.028, and the best-of-12 search makes the score mildly optimistic. **Ridge was retained.**
+
+Final holdout (292 houses, report-only):
+
+| Metric | Value |
+|---|---:|
+| R² (price) | **0.887** |
+| MAE (price) | **$18.9K** |
+| RMSE (price) | $29.5K |
+| RMSE (log) | 0.153 |
+
+Details: [`my-project/artifacts/final/README.md`](./my-project/artifacts/final/README.md) and [`my-project/artifacts/ensemble_round3/README.md`](./my-project/artifacts/ensemble_round3/README.md).
+
+## Quick Start
+
+### 1. Install
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
 pip install -r requirements.txt
 pip install -e .
 Copy-Item .env.example .env
 alembic -c my-project/alembic.ini upgrade head
 ```
 
-Replace `SECRET_KEY` in `.env` before using the app outside local practice.
+Set `SECRET_KEY` (at least 32 characters) in `.env`.
 
-## Data and Training
-
-Download the Kaggle House Prices competition data into `my-project/data/raw`:
+### 2. Get data and train
 
 ```powershell
 python my-project/src/scripts/download_house_prices.py --destination my-project/data/raw
-```
-
-This command uses `KAGGLE_API_TOKEN` from the environment or the standard
-Kaggle token file (`~/.kaggle/access_token`).
-
-Train a simple stable model:
-
-```powershell
-python my-project/src/ml/train.py
-```
-
-Run the full reportable workflow:
-
-```powershell
 python -m ml.baseline_round2
 python -c "from ml.ridge_tuning import run_ridge_tuning; run_ridge_tuning()"
 python -m ml.ensemble_round3
 python -m ml.finalize --allow-overwrite
 ```
 
-`ml.finalize` writes `my-project/model.pkl`, a final holdout report, and demo
-sample metadata under `my-project/artifacts/final/`.
+The download uses `KAGGLE_API_TOKEN` or `~/.kaggle/access_token`. `ml.finalize` writes `my-project/model.pkl` and the holdout report under `my-project/artifacts/final/`.
 
-## Database Migrations
-
-The schema is managed by Alembic, not by ad-hoc table creation.
+### 3. Run the API and UI
 
 ```powershell
-alembic -c my-project/alembic.ini upgrade head
-```
-
-The current migration creates:
-
-- `users`: email, hashed password, audit fields.
-- `prediction_history`: one-to-many records linked to users, with input JSON,
-  predicted price, model fingerprint, and audit fields.
-
-For deployment, migrations run during API startup so the SQLite database on the
-Render disk is ready before Uvicorn starts.
-
-## Run Locally
-
-Use separate terminals from the repository root:
-
-```powershell
-.\.venv\Scripts\Activate.ps1
 uvicorn api.main:app --app-dir my-project/src
-```
-
-```powershell
-.\.venv\Scripts\Activate.ps1
 python -m streamlit run my-project/src/streamlit_app/app.py
 ```
 
-Register and log in at `http://localhost:8501`. Streamlit stores the returned
-JWT in session state and sends it as `Authorization: Bearer <token>` when it
-calls `POST /api/v1/predict`.
+Open `http://localhost:8501`, register, and log in. API docs are at `http://127.0.0.1:8000/docs`.
 
-Routes:
+| Route | Purpose |
+|---|---|
+| `POST /api/v1/auth/register` · `/login` | Create account / get JWT |
+| `GET /api/v1/auth/me` | Current user |
+| `POST /api/v1/predict` | Predict price (JWT required) |
+| `GET /api/v1/predictions/history` | User prediction history |
+| `GET /health` | Model status and `model_sha256` |
 
-- `POST /api/v1/auth/register`
-- `POST /api/v1/auth/login`
-- `GET /api/v1/auth/me`
-- `POST /api/v1/predict`
-- `GET /api/v1/predictions/history`
-- `GET /health`
-
-## Retrain Simulation
-
-Record the current fingerprint from `GET http://localhost:8000/health`, then:
+### 4. Swap the model
 
 ```powershell
 python my-project/src/scripts/create_retrain_subset.py
 python my-project/src/ml/train.py --data-path my-project/data/retrain/train_subset.csv
 ```
 
-Restart Uvicorn with `Ctrl+C` and the same start command. A new `GET /health`
-response should report a different `model_sha256`, and predictions should use
-the new model without route or Streamlit changes.
+Restart Uvicorn. `/health` reports a new `model_sha256` with no route or UI changes.
 
-## Logging
-
-Set `LOG_LEVEL` in `.env` or the deployment environment. The API logs one
-record per request with request id, method, path, status code, and duration.
-
-Sensitive values are intentionally excluded from logs:
-
-- Passwords.
-- JWT tokens.
-- Authorization headers.
-- Prediction payload bodies.
-
-The response includes `X-Request-ID`; pass your own `X-Request-ID` header when
-you want to correlate a demo request with server logs.
-
-## Render Deployment
-
-The repo includes `render.yaml` for two Render web services:
-
-- `house-price-api`: FastAPI with an ephemeral SQLite database and the model
-  artifact packaged during the build.
-- `house-price-ui`: Streamlit frontend configured to call the API service.
-
-Both services use Render's free compute plan for the internship demo. Free
-instances spin down when idle, and their local files are ephemeral. Users and
-prediction history are therefore reset after an API restart, redeploy, or
-spin-down.
-
-Required Render secrets for the API service:
-
-- `SECRET_KEY`: at least 32 characters.
-- `KAGGLE_API_TOKEN`: Kaggle API token (the current `KGAT_...` format).
-
-Operational commands used by the Blueprint:
-
-```bash
-bash my-project/scripts/render_build.sh
-bash my-project/scripts/render_start_api.sh
-bash my-project/scripts/render_start_streamlit.sh
-```
-
-Render notes:
-
-- Python is pinned with `.python-version` and `PYTHON_VERSION=3.13.11`.
-- Services bind to `0.0.0.0:$PORT`.
-- The API build downloads Kaggle data and packages `model.pkl`.
-- Runtime startup runs Alembic migrations and then launches Uvicorn.
-- The API health check uses `/health`.
-- SQLite is stored at `/tmp/app.db`; it is intentionally non-persistent on the
-  free plan.
-- Open the API and UI several minutes before a live demo so both free services
-  have time to wake up.
-
-## Verification
-
-Use the project virtual environment:
+### 5. Verify
 
 ```powershell
-.\.venv\Scripts\python.exe -m pytest -q
-.\.venv\Scripts\python.exe -m ruff check .
-$env:BLACK_CACHE_DIR = (Resolve-Path 'my-project').Path + '\.black-cache'
-.\.venv\Scripts\python.exe -m black --check .
-.\.venv\Scripts\python.exe -m mypy my-project/src
+python -m pytest -q
+python -m ruff check .
+python -m black --check .
+python -m mypy my-project/src
 ```
 
-Pytest uses project-local cache and basetemp directories from `pyproject.toml`,
-which avoids Windows temp-directory permission issues.
-Black uses `BLACK_CACHE_DIR` in the project to avoid user-cache permission
-issues on Windows/OneDrive.
+## Deployment
 
-## Known Generated Files
+[`render.yaml`](./render.yaml) defines two free Render web services:
 
-These are expected local outputs and should remain untracked:
+- `house-price-api`: downloads Kaggle data and packages `model.pkl` at build time, runs Alembic migrations, then starts Uvicorn.
+- `house-price-ui`: the Streamlit client pointed at the API.
 
-- `my-project/data/`
-- `my-project/artifacts/`
-- `my-project/app.db`
-- `my-project/model.pkl`
-- `my-project/.pytest-cache/`
-- `my-project/.pytest-basetemp/`
-- `my-project/.black-cache/`
-- `my-project/src/*.egg-info/`
+Required secrets: `SECRET_KEY` and `KAGGLE_API_TOKEN`. SQLite lives at `/tmp/app.db`, so users and history reset on restart. Free instances sleep when idle, so open both services a few minutes before a demo.
 
-## Final Demo Checklist
+## Project Map
 
-1. Run migrations and start FastAPI.
-2. Start Streamlit.
-3. Register and log in.
-4. Confirm `/health` shows `model_loaded=true`.
-5. Submit a prediction and verify it appears in authenticated history.
-6. Run the retrain simulation and restart FastAPI.
-7. Confirm `/health` reports a new `model_sha256`.
-8. Show API request logs with `X-Request-ID` correlation.
-9. For cloud demo, open the Render Streamlit URL and repeat the same flow.
+| Path | Responsibility |
+|---|---|
+| [`my-project/src/ml/`](./my-project/src/ml/) | Preprocessing, baselines, tuning, ensembles, finalisation |
+| [`my-project/src/api/`](./my-project/src/api/) | FastAPI app, auth, prediction routes, request logging |
+| [`my-project/src/models/`](./my-project/src/models/) | SQLAlchemy entities with audit fields |
+| [`my-project/src/schemas/`](./my-project/src/schemas/) | Pydantic request/response contracts |
+| [`my-project/src/streamlit_app/`](./my-project/src/streamlit_app/) | Login, prediction, history, and demo UI |
+| [`my-project/alembic/`](./my-project/alembic/) | Database migrations |
+| [`my-project/notebooks/`](./my-project/notebooks/) | EDA and model-training notebooks |
+| [`my-project/tests/`](./my-project/tests/) | Test suite |
+
+Generated data, artifacts, `app.db`, `model.pkl`, and `.env` are not committed.
+
